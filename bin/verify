@@ -1,0 +1,116 @@
+#!/usr/bin/env zsh
+# verify - Simple verification script for dotfiles
+# Usage: verify
+
+DOTFILES="$(cd "$(dirname "$0")/.." && pwd)"
+export DOTFILES
+
+# Source this checkout so verification is tied to the repo under test.
+source "$DOTFILES/.zshrc" >/dev/null 2>&1
+SHELL_SOURCE_STATUS=$?
+
+echo "🔍 Verifying Dotfiles Setup..."
+echo ""
+
+PASS=0
+FAIL=0
+SKIP=0
+
+# Helper to test commands
+test_cmd() {
+    if eval "$1" >/dev/null 2>&1; then
+        echo "✓ $2"
+        ((PASS++))
+    else
+        echo "✗ $2"
+        ((FAIL++))
+    fi
+}
+
+test_symlink() {
+    local target="$1"
+    local expected="$2"
+    local label="$3"
+    local actual
+
+    actual="$(readlink "$target" 2>/dev/null || true)"
+    if [[ "$actual" = "$expected" ]]; then
+        echo "✓ $label"
+        ((PASS++))
+    elif [[ "${VERIFY_INSTALLED:-0}" = "1" ]]; then
+        echo "✗ $label"
+        ((FAIL++))
+    else
+        echo "⊘ $label (not linked to this checkout)"
+        ((SKIP++))
+    fi
+}
+
+# Test checkout shell files
+echo "📁 Checkout:"
+test_cmd "[[ -f \"$DOTFILES/.zshrc\" ]]" ".zshrc exists"
+test_cmd "[[ -f \"$DOTFILES/.aliases\" ]]" ".aliases exists"
+test_cmd "[[ -f \"$DOTFILES/.functions\" ]]" ".functions exists"
+test_cmd "[[ $SHELL_SOURCE_STATUS -eq 0 ]]" ".zshrc sources cleanly"
+echo ""
+
+# Test installed symlinks
+echo "🔗 Installed Links:"
+test_symlink "$HOME/.zshrc" "$DOTFILES/.zshrc" ".zshrc is symlinked"
+test_symlink "$HOME/.aliases" "$DOTFILES/.aliases" ".aliases is symlinked"
+test_symlink "$HOME/.functions" "$DOTFILES/.functions" ".functions is symlinked"
+echo ""
+
+# Test basic commands
+echo "⚙️  System Commands:"
+test_cmd "command -v date" "date command"
+test_cmd "command -v grep" "grep command"
+test_cmd "command -v awk" "awk command"
+test_cmd "command -v sed" "sed command"
+test_cmd "command -v sudo" "sudo command"
+test_cmd "command -v ifconfig" "ifconfig command"
+test_cmd "command -v python3" "python3 command"
+test_cmd "command -v devcontainer-stack" "devcontainer-stack command"
+echo ""
+
+# Test aliases
+echo "🔗 Aliases:"
+test_cmd "alias w" "w (working dir)"
+test_cmd "alias g" "g (git)"
+test_cmd "alias now" "now"
+test_cmd "alias dh" "dh (interactive help)"
+test_cmd "alias help" "help"
+echo ""
+
+# Test functions
+echo "📦 Functions:"
+test_cmd "typeset -f wt" "wt (worktree)"
+test_cmd "typeset -f week" "week"
+test_cmd "typeset -f uuid" "uuid"
+test_cmd "typeset -f urlencode" "urlencode"
+test_cmd "typeset -f dothelp" "dothelp"
+echo ""
+
+# Functional tests
+echo "🧪 Functional Tests:"
+test_cmd "week" "week returns value"
+test_cmd "uuid" "uuid generates ID"
+test_cmd "[[ \$(urlencode 'hello world') == 'hello+world' ]]" "urlencode works"
+test_cmd "devcontainer-stack list" "devcontainer-stack lists templates"
+echo ""
+
+# Summary
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Passed: $PASS"
+echo "Skipped: $SKIP"
+echo "Failed: $FAIL"
+
+if [ $FAIL -eq 0 ]; then
+    echo ""
+    echo "✅ All tests passed!"
+    exit 0
+else
+    echo ""
+    echo "❌ Some tests failed"
+    exit 1
+fi

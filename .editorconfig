@@ -1,0 +1,16 @@
+# Personal fallback editor conventions for any directory that does not ship
+# its own .editorconfig.
+
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown is owned by Prettier (2-space JSON code blocks, 80-col wrap).
+[*.md]
+indent_size = 2

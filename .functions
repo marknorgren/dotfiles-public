@@ -1,0 +1,58 @@
+mkcd() {
+    mkdir -p "$1" && cd "$1"
+}
+
+uuid() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    else
+        python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+    fi
+}
+
+urlencode() {
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote_plus(sys.argv[1]))' "$1"
+}
+
+week() {
+    date +"%V"
+}
+
+dothelp() {
+    local query="${1:-}"
+    if [[ -z "$query" ]]; then
+        printf '%s\n' "Commands: g, gs, w, reload, now, week, uuid, urlencode, wt"
+        return 0
+    fi
+    alias | grep -i "$query" || true
+    functions | grep -E "^[[:alnum:]_.:-]+ \\(\\)" | grep -i "$query" || true
+}
+
+wt() {
+    if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+        echo "wt: not inside a git repository" >&2
+        return 1
+    fi
+    if [[ $# -eq 0 ]]; then
+        git worktree list
+        return 0
+    fi
+    local branch="$1"
+    local root parent repo safe target
+    root="$(git rev-parse --show-toplevel)"
+    parent="$(dirname "$root")"
+    repo="$(basename "$root")"
+    safe="${branch//\//__}"
+    safe="${safe//[^A-Za-z0-9_.-]/_}"
+    target="$parent/${repo}_wt/$safe"
+    mkdir -p "$(dirname "$target")"
+    if [[ -d "$target" ]]; then
+        cd "$target"
+    else
+        git worktree add -b "$branch" "$target"
+        cd "$target"
+    fi
+}

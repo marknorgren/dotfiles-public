@@ -1,0 +1,4 @@
+# Allow external sources
+external-sources=true
+# Source-specific settings
+source-path=SCRIPTDIR

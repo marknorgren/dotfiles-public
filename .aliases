@@ -1,0 +1,12 @@
+alias g='git'
+alias gs='git status'
+alias w='cd "$HOME/working"'
+alias reload='source ~/.zshrc'
+alias now='date -u +"%Y-%m-%dT%H:%M:%SZ"'
+alias dh='dothelp'
+alias help='dothelp'
+
+alias ll='ls -lah'
+alias la='ls -A'
+alias ..='cd ..'
+alias ...='cd ../..'

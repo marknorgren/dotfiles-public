@@ -1,0 +1,28 @@
+[init]
+    defaultBranch = main
+
+[include]
+    path = ~/.gitconfig.local
+
+[core]
+    excludesfile = ~/.gitignore_global
+
+[pull]
+    rebase = true
+
+[rerere]
+    enabled = true
+    autoupdate = true
+
+[alias]
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
+    lg = log --oneline --graph --decorate --all
+    unstage = reset HEAD --
+    last = log -1 HEAD
+
+[credential "https://github.com"]
+    helper =
+    helper = !gh auth git-credential

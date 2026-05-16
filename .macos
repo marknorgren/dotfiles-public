@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    printf 'setup-macos only runs on macOS.\n' >&2
+    exit 69
+fi
+
+DRY_RUN=false
+
+case "${1:-}" in
+    "")
+        ;;
+    --dry-run)
+        DRY_RUN=true
+        ;;
+    --help|-h)
+        printf 'Usage: %s [--dry-run]\n' "$0"
+        exit 0
+        ;;
+    *)
+        printf 'Usage: %s [--dry-run]\n' "$0" >&2
+        exit 64
+        ;;
+esac
+
+run() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '+'
+        printf ' %q' "$@"
+        printf '\n'
+    else
+        "$@"
+    fi
+}
+
+restart_process() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '+ killall %q\n' "$1"
+    else
+        killall "$1" &> /dev/null || true
+    fi
+}
+
+###############################################################################
+# Essential Settings                                                           #
+###############################################################################
+
+echo "Configuring essential settings..."
+
+# Create Books directory if it doesn't exist
+run mkdir -p "$HOME/Documents/Books"
+
+# Set system locale and currency settings
+run defaults write NSGlobalDomain AppleLocale -string "en_US"
+run defaults write NSGlobalDomain AppleMeasurementUnits -string "Inches"
+run defaults write NSGlobalDomain AppleMetricUnits -bool false
+run defaults write NSGlobalDomain AppleTemperatureUnit -string "Fahrenheit"
+run defaults write NSGlobalDomain AppleICUDateFormatStrings -dict-add "1" "M/d/yy"
+run defaults write NSGlobalDomain AppleICUDateFormatStrings -dict-add "2" "MMM d, y"
+run defaults write NSGlobalDomain AppleICUDateFormatStrings -dict-add "3" "MMMM d, y"
+run defaults write NSGlobalDomain AppleICUDateFormatStrings -dict-add "4" "EEEE, MMMM d, y"
+
+# Set mouse and trackpad tracking speed to 2.1
+run defaults write NSGlobalDomain com.apple.mouse.scaling -float 2.1
+run defaults write NSGlobalDomain com.apple.trackpad.scaling -float 2.1
+
+# Set Dark mode
+run defaults write NSGlobalDomain AppleInterfaceStyle -string "Dark"
+
+# Trackpad settings
+run defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
+run defaults write com.apple.AppleMultitouchTrackpad Clicking -bool true
+run defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool true
+run defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerDrag -bool true
+
+# Show battery percentage
+run defaults write com.apple.controlcenter BatteryShowPercentage -bool true
+run defaults write com.apple.controlcenter "NSStatusItem Visible Battery" -bool true
+
+###############################################################################
+# Finder                                                                      #
+###############################################################################
+
+echo "Configuring Finder..."
+
+# Show all file extensions
+run defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+
+# Show path bar and status bar
+run defaults write com.apple.finder ShowPathbar -bool true
+run defaults write com.apple.finder ShowStatusBar -bool true
+
+# Keep folders on top when sorting by name
+run defaults write com.apple.finder _FXSortFoldersFirst -bool true
+
+# Avoid creating .DS_Store files on network or USB volumes
+run defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+run defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
+
+# Show hidden files
+run defaults write com.apple.finder AppleShowAllFiles -bool true
+
+# Use list view in all Finder windows
+run defaults write com.apple.finder FXPreferredViewStyle -string "Nlsv"
+
+###############################################################################
+# Dock                                                                        #
+###############################################################################
+
+echo "Configuring Dock..."
+
+# Auto-hide the Dock
+run defaults write com.apple.dock autohide -bool true
+
+# Remove the auto-hiding delay
+run defaults write com.apple.dock autohide-delay -float 0
+run defaults write com.apple.dock autohide-time-modifier -float 0.5
+
+# Don't show recent applications in Dock
+run defaults write com.apple.dock show-recents -bool false
+
+###############################################################################
+# Keyboard                                                                    #
+###############################################################################
+
+echo "Configuring keyboard settings..."
+
+# Set a fast keyboard repeat rate
+run defaults write NSGlobalDomain KeyRepeat -int 2
+run defaults write NSGlobalDomain InitialKeyRepeat -int 15
+
+# Disable automatic capitalization and other substitutions
+run defaults write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
+run defaults write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled -bool false
+run defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
+run defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+run defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+run defaults write NSGlobalDomain AppleShowScrollBars -string "Always"
+
+###############################################################################
+# Kill affected applications                                                  #
+###############################################################################
+
+echo "Restarting affected applications..."
+
+# Kill all potentially affected processes
+for app in "Dock" "Finder" "SystemUIServer" "cfprefsd"; do
+    restart_process "${app}"
+done
+
+echo "macOS settings updated. Some changes may require logout or restart."

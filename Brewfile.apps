@@ -1,0 +1,22 @@
+# Optional GUI applications.
+#
+# Install with:
+#   brew bundle --file Brewfile.apps
+
+# AI and audio tools
+cask "macwhisper"
+cask "lm-studio"
+cask "superwhisper"
+
+# Communication
+cask "slack"
+cask "telegram"
+
+# Media
+cask "spotify"
+cask "vlc"
+cask "makemkv"
+
+# Notes and utilities
+cask "obsidian"
+cask "soulver"

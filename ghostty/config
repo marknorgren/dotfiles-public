@@ -1,0 +1,15 @@
+# Ghostty Terminal Configuration
+# https://ghostty.org/docs/config
+
+# Disable Ghostty's built-in title management to use custom zsh title functions
+# This allows our .zshrc functions to control the window title format
+# shell-integration-features = cursor,no-sudo,no-title
+
+# Add any additional Ghostty configuration below
+# Examples:
+# font-family = "JetBrains Mono"
+# font-size = 14
+# theme = dark
+# window-padding-x = 10
+# window-padding-y = 10
+keybind = shift+enter=text:\x1b\r

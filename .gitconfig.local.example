@@ -1,0 +1,9 @@
+[user]
+    name = Your Name
+    email = you@example.com
+
+# Optional SSH signing:
+# [gpg]
+#     format = ssh
+# [commit]
+#     gpgsign = true

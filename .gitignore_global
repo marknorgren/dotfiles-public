@@ -1,0 +1,6 @@
+.DS_Store
+.DS_Store?
+.cursor
+cursor-rules.json
+# Claude Code settings
+**/.claude/settings.local.json

@@ -1,0 +1,29 @@
+{
+  // Show command center in the window
+  "window.commandCenter": true,
+
+  // Allow terminal to handle certain commands directly (like clear)
+  "terminal.integrated.commandsToSkipShell": [
+    "workbench.action.terminal.clear"
+  ],
+
+  // Enable sending keybindings to the shell
+  "terminal.integrated.sendKeybindingsToShell": true,
+
+  // Make Option key behave as Meta key in terminal
+  "terminal.integrated.macOptionIsMeta": true,
+  "terminal.external.osxExec": "Warp.app",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "git.openRepositoryInParentFolders": "never",
+  "editor.formatOnSave": true,
+  "[csharp]": {
+    "editor.defaultFormatter": "csharpier.csharpier-vscode"
+  },
+  "terminal.integrated.suggest.enabled": true,
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

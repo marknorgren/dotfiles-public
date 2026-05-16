@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Dotfiles bootstrap installer
+# This script installs Deno if needed, then runs the TypeScript installer
+set -euo pipefail
+
+REPO_URL="${DOTFILES_REPO:-https://github.com/marknorgren/dotfiles-public.git}"
+TARGET_DIR="${DOTFILES_TARGET:-$HOME/.dotfiles-public}"
+
+script_path="${BASH_SOURCE[0]:-$0}"
+if [[ "$script_path" == "-" || "$script_path" == "bash" ]]; then
+    DOTFILES_DIR="$PWD"
+else
+    DOTFILES_DIR="$(cd "$(dirname "$script_path")" && pwd)"
+fi
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
+log_success() { echo -e "${GREEN}✓${NC} $1"; }
+log_error() { echo -e "${RED}✗${NC} $1"; }
+log_header() { echo -e "\n${BOLD}▸ $1${NC}"; }
+
+# Detect platform
+detect_platform() {
+    case "$(uname -s)" in
+        Darwin) echo "macos" ;;
+        Linux)  echo "linux" ;;
+        *)      echo "unknown" ;;
+    esac
+}
+
+# Install Deno if not present
+install_deno() {
+    if command -v deno &> /dev/null; then
+        log_info "Deno already installed: $(deno --version | head -1)"
+        return 0
+    fi
+
+    log_header "Installing Deno"
+    ensure_deno_archive_tool
+
+    if [[ "$(detect_platform)" == "macos" ]]; then
+        # Try Homebrew first on macOS
+        if command -v brew &> /dev/null; then
+            log_info "Installing via Homebrew..."
+            brew install deno
+        else
+            log_info "Installing via curl..."
+            curl -fsSL https://deno.land/install.sh | sh
+            export PATH="$HOME/.deno/bin:$PATH"
+        fi
+    else
+        log_info "Installing via curl..."
+        curl -fsSL https://deno.land/install.sh | sh
+        export PATH="$HOME/.deno/bin:$PATH"
+    fi
+
+    log_success "Deno installed: $(deno --version | head -1)"
+}
+
+run_as_root() {
+    if [[ "$(id -u)" == "0" ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+ensure_deno_archive_tool() {
+    if command -v unzip &> /dev/null || command -v 7z &> /dev/null; then
+        return 0
+    fi
+
+    if [[ "$(detect_platform)" != "linux" ]]; then
+        log_error "Deno installer requires unzip or 7z"
+        exit 1
+    fi
+
+    log_info "Installing unzip for the Deno installer..."
+    if command -v apt-get &> /dev/null; then
+        run_as_root apt-get update
+        run_as_root apt-get install -y unzip
+    elif command -v dnf &> /dev/null; then
+        run_as_root dnf install -y unzip
+    else
+        log_error "Install unzip or 7z, then rerun this script"
+        exit 1
+    fi
+}
+
+# Install Xcode Command Line Tools (macOS only)
+install_xcode_cli() {
+    if [[ "$(detect_platform)" != "macos" ]]; then
+        return 0
+    fi
+
+    if xcode-select -p &> /dev/null; then
+        log_info "Xcode Command Line Tools already installed"
+        return 0
+    fi
+
+    log_header "Installing Xcode Command Line Tools"
+    log_info "A dialog will appear - click 'Install' to continue"
+    xcode-select --install
+
+    # Wait for installation
+    until xcode-select -p &> /dev/null; do
+        sleep 5
+    done
+    log_success "Xcode Command Line Tools installed"
+}
+
+# When this script is run via curl, clone the repo first, then re-run locally.
+bootstrap_repo_if_needed() {
+    if [[ -f "$DOTFILES_DIR/scripts/install.ts" ]]; then
+        return 0
+    fi
+
+    log_header "Bootstrapping dotfiles repository"
+
+    if ! command -v git &> /dev/null; then
+        log_error "git is required before the dotfiles repo can be cloned"
+        if [[ "$(detect_platform)" == "linux" ]]; then
+            log_info "Install git with your distro package manager, then rerun this script"
+        fi
+        exit 1
+    fi
+
+    if [[ -d "$TARGET_DIR/.git" ]]; then
+        log_info "Updating existing checkout: $TARGET_DIR"
+        git -C "$TARGET_DIR" pull --ff-only
+    elif [[ -e "$TARGET_DIR" ]]; then
+        log_error "$TARGET_DIR already exists and is not a git checkout"
+        log_info "Set DOTFILES_TARGET to another directory or move the existing path"
+        exit 1
+    else
+        log_info "Cloning $REPO_URL to $TARGET_DIR"
+        git clone "$REPO_URL" "$TARGET_DIR"
+    fi
+
+    exec /usr/bin/env bash "$TARGET_DIR/install" "$@"
+}
+
+# Main
+main() {
+    echo -e "${BOLD}Dotfiles Installer${NC}"
+    echo "=================="
+    echo
+
+    log_info "Dotfiles directory: $DOTFILES_DIR"
+    log_info "Platform: $(detect_platform)"
+
+    # macOS: ensure Xcode CLI tools
+    install_xcode_cli
+
+    # Remote one-liner mode: clone/update first, then continue from checkout.
+    bootstrap_repo_if_needed "$@"
+
+    # Install Deno
+    install_deno
+
+    # Run the TypeScript installer
+    log_header "Running installer"
+
+    # Ensure deno is in PATH
+    if ! command -v deno &> /dev/null; then
+        export PATH="$HOME/.deno/bin:$PATH"
+    fi
+
+    cd "$DOTFILES_DIR"
+    export DOTFILES="$DOTFILES_DIR"
+    deno run \
+        --allow-read \
+        --allow-write \
+        --allow-run \
+        --allow-env \
+        scripts/install.ts "$@"
+}
+
+main "$@"

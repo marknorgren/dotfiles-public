@@ -1,0 +1,22 @@
+# OS/runtime noise
+.DS_Store
+._*
+Thumbs.db
+*.log
+*.sqlite
+
+# Dependencies and caches
+node_modules/
+.deno/
+tmp/
+
+# Secrets and local-only config
+.env
+.env.*
+secrets/
+local/*
+!local/.gitkeep
+!local/README.md
+
+# Private overlay repo
+.dotfiles-work/

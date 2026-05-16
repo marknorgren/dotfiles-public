@@ -1,0 +1,405 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STACKS=(base deno node-pnpm python-uv go dotnet infra)
+
+usage() {
+    cat <<'EOF'
+Usage:
+  devcontainer-stack list
+  devcontainer-stack init <stack> [target] [--force]
+  devcontainer-stack build <stack> [target]
+  devcontainer-stack shell <stack> [target]
+  devcontainer-stack up <stack> [target]
+
+Stacks:
+  base       Ubuntu, zsh, git, just, shellcheck, common CLI tools
+  deno       base + Deno
+  node-pnpm  Node 22 devcontainer + pnpm
+  python-uv  Python 3.12 devcontainer + uv
+  go         Go devcontainer
+  dotnet     .NET 9 devcontainer
+  infra      base + Terraform
+EOF
+}
+
+die() {
+    printf 'devcontainer-stack: %s\n' "$*" >&2
+    exit 1
+}
+
+has_stack() {
+    local wanted="$1"
+    local stack
+    for stack in "${STACKS[@]}"; do
+        [[ "$stack" == "$wanted" ]] && return 0
+    done
+    return 1
+}
+
+target_dir() {
+    local target="${1:-.}"
+    mkdir -p "$target"
+    cd "$target" && pwd
+}
+
+project_name() {
+    local name
+    name="$(
+        basename "$1" |
+            tr '[:upper:]' '[:lower:]' |
+            tr -c 'a-z0-9_.-' '-' |
+            sed -E 's/^-+//; s/-+$//'
+    )"
+    printf '%s\n' "${name:-project}"
+}
+
+image_name() {
+    local stack="$1"
+    local target="$2"
+    local name
+    name="$(project_name "$target")"
+    printf 'devcontainer-%s-%s:local\n' "$name" "$stack"
+}
+
+list_stacks() {
+    usage | sed -n '/^Stacks:/,$p'
+}
+
+common_apt() {
+    cat <<'EOF'
+RUN rm -f /etc/apt/sources.list.d/yarn.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    fd-find \
+    fzf \
+    git \
+    jq \
+    less \
+    ripgrep \
+    shellcheck \
+    sudo \
+    tmux \
+    unzip \
+    zsh \
+  && rm -rf /var/lib/apt/lists/*
+
+ARG JUST_VERSION=1.51.0
+# Keep this in sync with .devcontainer/Dockerfile.
+RUN case "$(uname -m)" in \
+      x86_64) just_target="x86_64-unknown-linux-musl"; just_sha="c8f085ca3e885723c341d06243fc291b5abfdc8bbe3b2c076b117de490387b59" ;; \
+      aarch64|arm64) just_target="aarch64-unknown-linux-musl"; just_sha="ed7ec466b77709198fd4afed253dba0270203ba5eb1c006bee2b0139090284f5" ;; \
+      *) echo "unsupported architecture for just: $(uname -m)" >&2; exit 1 ;; \
+    esac \
+  && curl -fsSLO "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-${just_target}.tar.gz" \
+  && echo "${just_sha}  just-${JUST_VERSION}-${just_target}.tar.gz" | sha256sum -c - \
+  && tar -xzf "just-${JUST_VERSION}-${just_target}.tar.gz" just \
+  && install -m 0755 just /usr/local/bin/just \
+  && rm -f just "just-${JUST_VERSION}-${just_target}.tar.gz"
+EOF
+}
+
+write_dockerfile() {
+    local stack="$1"
+    local file="$2"
+
+    case "$stack" in
+        base)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            ;;
+        deno)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG DENO_VERSION=2.7.14
+ENV DENO_INSTALL=/usr/local
+
+EOF
+            common_apt >>"$file"
+            cat >>"$file" <<'EOF'
+
+RUN curl -fsSL https://deno.land/install.sh | sh -s "v${DENO_VERSION}"
+EOF
+            ;;
+        node-pnpm)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            cat >>"$file" <<'EOF'
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+EOF
+            ;;
+        python-uv)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            cat >>"$file" <<'EOF'
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin sh
+EOF
+            ;;
+        go)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/go:1-bookworm
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            ;;
+        dotnet)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            ;;
+        infra)
+            cat >"$file" <<'EOF'
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+EOF
+            common_apt >>"$file"
+            cat >>"$file" <<'EOF'
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends gnupg lsb-release \
+  && install -d -m 0755 /etc/apt/keyrings \
+  && curl -fsSL https://apt.releases.hashicorp.com/gpg \
+    | gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/hashicorp.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends terraform \
+  && rm -rf /var/lib/apt/lists/*
+EOF
+            ;;
+        *)
+            die "unknown stack: $stack"
+            ;;
+    esac
+}
+
+write_devcontainer_json() {
+    local stack="$1"
+    local file="$2"
+
+    cat >"$file" <<EOF
+{
+  "name": "${stack}",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/\${localWorkspaceFolderBasename}",
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}
+EOF
+}
+
+write_post_create() {
+    local stack="$1"
+    local file="$2"
+
+    cat >"$file" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -f justfile ] || [ -f Justfile ]; then
+  just --list >/dev/null
+fi
+EOF
+
+    case "$stack" in
+        node-pnpm)
+            cat >>"$file" <<'EOF'
+
+corepack enable
+if [ -f pnpm-lock.yaml ]; then
+  pnpm install --frozen-lockfile
+elif [ -f package.json ]; then
+  pnpm install
+fi
+EOF
+            ;;
+        python-uv)
+            cat >>"$file" <<'EOF'
+
+if [ -f pyproject.toml ]; then
+  uv sync
+fi
+EOF
+            ;;
+        go)
+            cat >>"$file" <<'EOF'
+
+if [ -f go.mod ]; then
+  go mod download
+fi
+EOF
+            ;;
+        dotnet)
+            cat >>"$file" <<'EOF'
+
+solution="$(find . -maxdepth 2 -name '*.sln' -print -quit)"
+if [ -n "$solution" ]; then
+  dotnet restore "$solution"
+elif find . -maxdepth 2 -name '*.csproj' -print -quit | grep -q .; then
+  dotnet restore
+fi
+EOF
+            ;;
+    esac
+
+    chmod +x "$file"
+}
+
+init_stack() {
+    local stack="$1"
+    local target="$2"
+    local force="${3:-0}"
+    local devcontainer_dir="$target/.devcontainer"
+
+    has_stack "$stack" || die "unknown stack: $stack"
+    mkdir -p "$devcontainer_dir"
+
+    if [[ "$force" != "1" ]]; then
+        [[ ! -e "$devcontainer_dir/Dockerfile" ]] ||
+            die "$devcontainer_dir/Dockerfile exists; rerun with --force"
+        [[ ! -e "$devcontainer_dir/devcontainer.json" ]] ||
+            die "$devcontainer_dir/devcontainer.json exists; rerun with --force"
+        [[ ! -e "$devcontainer_dir/post-create.sh" ]] ||
+            die "$devcontainer_dir/post-create.sh exists; rerun with --force"
+    fi
+
+    write_dockerfile "$stack" "$devcontainer_dir/Dockerfile"
+    write_devcontainer_json "$stack" "$devcontainer_dir/devcontainer.json"
+    write_post_create "$stack" "$devcontainer_dir/post-create.sh"
+    printf 'Initialized %s devcontainer in %s\n' "$stack" "$devcontainer_dir"
+}
+
+ensure_initialized() {
+    local stack="$1"
+    local target="$2"
+
+    if [[ -f "$target/.devcontainer/Dockerfile" &&
+        -f "$target/.devcontainer/devcontainer.json" ]]; then
+        return 0
+    fi
+
+    init_stack "$stack" "$target" 0
+}
+
+build_stack() {
+    local stack="$1"
+    local target="$2"
+    local image
+
+    ensure_initialized "$stack" "$target"
+    image="${DEVCONTAINER_STACK_IMAGE:-$(image_name "$stack" "$target")}"
+    docker build -f "$target/.devcontainer/Dockerfile" -t "$image" "$target"
+    printf '%s\n' "$image"
+}
+
+shell_stack() {
+    local stack="$1"
+    local target="$2"
+    local image
+    local workspace
+
+    image="$(build_stack "$stack" "$target" | tail -n 1)"
+    workspace="/workspaces/$(project_name "$target")"
+    docker run --rm -it \
+        --user vscode \
+        -e DEVCONTAINER_STACK="$stack" \
+        -v "$target:$workspace" \
+        -w "$workspace" \
+        "$image" \
+        bash -lc 'if [ "${DEVCONTAINER_RUN_POST_CREATE:-1}" = "1" ] && [ -f .devcontainer/post-create.sh ]; then bash .devcontainer/post-create.sh; fi; if command -v zsh >/dev/null 2>&1; then exec zsh -l; else exec bash -l; fi'
+}
+
+up_stack() {
+    local stack="$1"
+    local target="$2"
+
+    ensure_initialized "$stack" "$target"
+    if command -v devcontainer >/dev/null 2>&1; then
+        devcontainer up --workspace-folder "$target"
+    else
+        printf 'devcontainer CLI not found; opening Docker shell instead.\n' >&2
+        shell_stack "$stack" "$target"
+    fi
+}
+
+main() {
+    local command="${1:-}"
+    shift || true
+
+    case "$command" in
+        list)
+            list_stacks
+            ;;
+        init)
+            local stack="${1:-}"
+            local target_arg="${2:-.}"
+            local force=0
+            [[ -n "$stack" ]] || die "stack is required"
+            if [[ "${3:-}" == "--force" || "${2:-}" == "--force" ]]; then
+                force=1
+                [[ "${2:-}" == "--force" ]] && target_arg="."
+            fi
+            init_stack "$stack" "$(target_dir "$target_arg")" "$force"
+            ;;
+        build)
+            local stack="${1:-}"
+            local target_arg="${2:-.}"
+            [[ -n "$stack" ]] || die "stack is required"
+            build_stack "$stack" "$(target_dir "$target_arg")"
+            ;;
+        shell)
+            local stack="${1:-}"
+            local target_arg="${2:-.}"
+            [[ -n "$stack" ]] || die "stack is required"
+            shell_stack "$stack" "$(target_dir "$target_arg")"
+            ;;
+        up)
+            local stack="${1:-}"
+            local target_arg="${2:-.}"
+            [[ -n "$stack" ]] || die "stack is required"
+            up_stack "$stack" "$(target_dir "$target_arg")"
+            ;;
+        "" | -h | --help | help)
+            usage
+            ;;
+        *)
+            usage >&2
+            die "unknown command: $command"
+            ;;
+    esac
+}
+
+main "$@"
