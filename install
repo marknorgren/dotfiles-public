@@ -174,12 +174,20 @@ main() {
 
     cd "$DOTFILES_DIR"
     export DOTFILES="$DOTFILES_DIR"
-    deno run \
-        --allow-read \
-        --allow-write \
-        --allow-run \
-        --allow-env \
-        scripts/install.ts "$@"
+    deno_cmd=(
+        deno run
+        --allow-read
+        --allow-write
+        --allow-run
+        --allow-env
+        scripts/install.ts
+    )
+
+    if [[ -r /dev/tty ]]; then
+        "${deno_cmd[@]}" "$@" < /dev/tty
+    else
+        "${deno_cmd[@]}" "$@"
+    fi
 }
 
 main "$@"
