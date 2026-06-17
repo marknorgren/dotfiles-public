@@ -41,6 +41,12 @@ install_deno() {
         return 0
     fi
 
+    if [[ -x "$HOME/.deno/bin/deno" ]]; then
+        export PATH="$HOME/.deno/bin:$PATH"
+        log_info "Deno already installed: $(deno --version | head -1)"
+        return 0
+    fi
+
     log_header "Installing Deno"
     ensure_deno_archive_tool
 
@@ -51,12 +57,12 @@ install_deno() {
             brew install deno
         else
             log_info "Installing via curl..."
-            curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path
+            curl -fsSL https://deno.land/install.sh | CI=1 sh -s -- --no-modify-path
             export PATH="$HOME/.deno/bin:$PATH"
         fi
     else
         log_info "Installing via curl..."
-        curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path
+        curl -fsSL https://deno.land/install.sh | CI=1 sh -s -- --no-modify-path
         export PATH="$HOME/.deno/bin:$PATH"
     fi
 

@@ -69,6 +69,7 @@ export async function run(
     args: cmd.slice(1),
     cwd,
     env: env ? { ...Deno.env.toObject(), ...env } : undefined,
+    stdin: "inherit",
     stdout: silent ? "null" : "inherit",
     stderr: silent ? "null" : "inherit",
   });
