@@ -113,7 +113,8 @@ async function installHomebrew(
   let brewCommand = await resolveHomebrewCommand();
 
   if (!brewCommand) {
-    if (!(await canInstallHomebrew())) {
+    const canPromptForSudo = Deno.stdin.isTerminal();
+    if (!canPromptForSudo && !(await hasNonInteractiveSudo())) {
       log.warn(
         "Homebrew is not installed and non-interactive sudo access is unavailable.",
       );
@@ -126,10 +127,13 @@ async function installHomebrew(
     log.step("Installing Homebrew...");
     if (!options.dryRun) {
       try {
+        const installCommand = canPromptForSudo
+          ? '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+          : 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"';
         await run([
           "/bin/bash",
           "-c",
-          'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+          installCommand,
         ]);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -177,7 +181,7 @@ async function resolveHomebrewCommand(): Promise<string | undefined> {
   }
 }
 
-async function canInstallHomebrew(): Promise<boolean> {
+async function hasNonInteractiveSudo(): Promise<boolean> {
   try {
     const command = new Deno.Command("sudo", {
       args: ["-n", "-v"],
