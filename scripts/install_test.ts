@@ -10,7 +10,7 @@ async function writeExecutable(path: string, contents: string): Promise<void> {
 }
 
 Deno.test({
-  name: "installer skips Homebrew bootstrap for non-admin macOS users",
+  name: "installer skips Homebrew bootstrap without non-interactive sudo",
   ignore: Deno.build.os !== "darwin",
   async fn() {
     const root = await Deno.makeTempDir();
@@ -27,10 +27,7 @@ Deno.test({
       `${bin}/hostname`,
       "#!/bin/sh\nprintf test-host\n",
     );
-    await writeExecutable(
-      `${bin}/id`,
-      "#!/bin/sh\nprintf 'staff everyone localaccounts'\n",
-    );
+    await writeExecutable(`${bin}/sudo`, "#!/bin/sh\nexit 1\n");
     await writeExecutable(
       `${bin}/which`,
       '#!/bin/sh\nif [ "$1" = "mise" ]; then\n  exit 0\nfi\nexit 1\n',
@@ -65,7 +62,7 @@ Deno.test({
 
     assert(code === 0, `installer failed: ${output}`);
     assert(
-      output.includes("not an Administrator"),
+      output.includes("non-interactive sudo access is unavailable"),
       `expected non-admin warning, got: ${output}`,
     );
     assert(

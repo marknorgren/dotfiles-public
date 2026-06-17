@@ -6,7 +6,7 @@
 
 import { detectPlatform, getPaths, type PlatformInfo } from "./lib/platform.ts";
 import { createAllSymlinks } from "./lib/symlink.ts";
-import { capture, commandExists, log, run } from "./lib/log.ts";
+import { commandExists, log, run } from "./lib/log.ts";
 import { parseArgs } from "@std/cli/parse-args";
 
 interface InstallOptions {
@@ -115,21 +115,28 @@ async function installHomebrew(
   if (!brewCommand) {
     if (!(await canInstallHomebrew())) {
       log.warn(
-        "Homebrew is not installed and this macOS user is not an Administrator.",
+        "Homebrew is not installed and non-interactive sudo access is unavailable.",
       );
       log.warn(
-        "Skipping Brewfile packages; re-run with --skip-packages or install Homebrew as an admin user.",
+        "Skipping Brewfile packages; re-run with --skip-packages or install Homebrew manually.",
       );
       return;
     }
 
     log.step("Installing Homebrew...");
     if (!options.dryRun) {
-      await run([
-        "/bin/bash",
-        "-c",
-        'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
-      ]);
+      try {
+        await run([
+          "/bin/bash",
+          "-c",
+          'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+        ]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn(`Homebrew installation failed: ${message}`);
+        log.warn("Skipping Brewfile packages");
+        return;
+      }
       brewCommand = await resolveHomebrewCommand();
     }
   } else {
@@ -172,8 +179,13 @@ async function resolveHomebrewCommand(): Promise<string | undefined> {
 
 async function canInstallHomebrew(): Promise<boolean> {
   try {
-    const groups = await capture(["id", "-Gn"]);
-    return groups.split(/\s+/).includes("admin");
+    const command = new Deno.Command("sudo", {
+      args: ["-n", "-v"],
+      stdout: "null",
+      stderr: "null",
+    });
+    const { code } = await command.output();
+    return code === 0;
   } catch {
     return false;
   }
