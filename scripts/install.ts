@@ -6,7 +6,7 @@
 
 import { detectPlatform, getPaths, type PlatformInfo } from "./lib/platform.ts";
 import { createAllSymlinks } from "./lib/symlink.ts";
-import { commandExists, log, run } from "./lib/log.ts";
+import { capture, commandExists, log, run } from "./lib/log.ts";
 import { parseArgs } from "@std/cli/parse-args";
 
 interface InstallOptions {
@@ -110,9 +110,19 @@ async function installHomebrew(
   paths: ReturnType<typeof getPaths>,
   options: InstallOptions,
 ) {
-  const hasHomebrew = await commandExists("brew");
+  let brewCommand = await resolveHomebrewCommand();
 
-  if (!hasHomebrew) {
+  if (!brewCommand) {
+    if (!(await canInstallHomebrew())) {
+      log.warn(
+        "Homebrew is not installed and this macOS user is not an Administrator.",
+      );
+      log.warn(
+        "Skipping Brewfile packages; re-run with --skip-packages or install Homebrew as an admin user.",
+      );
+      return;
+    }
+
     log.step("Installing Homebrew...");
     if (!options.dryRun) {
       await run([
@@ -120,9 +130,15 @@ async function installHomebrew(
         "-c",
         'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
       ]);
+      brewCommand = await resolveHomebrewCommand();
     }
   } else {
     log.info("Homebrew already installed");
+  }
+
+  if (!brewCommand) {
+    log.warn("Homebrew is not available on PATH; skipping Brewfile packages");
+    return;
   }
 
   // Install from Brewfile
@@ -131,10 +147,35 @@ async function installHomebrew(
     await Deno.stat(brewfilePath);
     log.step("Installing packages from Brewfile...");
     if (!options.dryRun) {
-      await run(["brew", "bundle", "--file", brewfilePath]);
+      await run([brewCommand, "bundle", "--file", brewfilePath]);
     }
   } catch {
     log.warn("No Brewfile found, skipping");
+  }
+}
+
+async function resolveHomebrewCommand(): Promise<string | undefined> {
+  if (await commandExists("brew")) return "brew";
+  if (Deno.env.get("DOTFILES_TEST_DISABLE_SYSTEM_BREW") === "1") {
+    return undefined;
+  }
+
+  for (const path of ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]) {
+    try {
+      const stat = await Deno.stat(path);
+      if (stat.isFile) return path;
+    } catch {
+      // Keep looking.
+    }
+  }
+}
+
+async function canInstallHomebrew(): Promise<boolean> {
+  try {
+    const groups = await capture(["id", "-Gn"]);
+    return groups.split(/\s+/).includes("admin");
+  } catch {
+    return false;
   }
 }
 

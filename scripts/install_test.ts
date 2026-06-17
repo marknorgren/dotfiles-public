@@ -10,6 +10,72 @@ async function writeExecutable(path: string, contents: string): Promise<void> {
 }
 
 Deno.test({
+  name: "installer skips Homebrew bootstrap for non-admin macOS users",
+  ignore: Deno.build.os !== "darwin",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+
+    await Deno.mkdir(dotfiles, { recursive: true });
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.writeTextFile(`${dotfiles}/Brewfile`, 'brew "just"\n');
+
+    await writeExecutable(
+      `${bin}/hostname`,
+      "#!/bin/sh\nprintf test-host\n",
+    );
+    await writeExecutable(
+      `${bin}/id`,
+      "#!/bin/sh\nprintf 'staff everyone localaccounts'\n",
+    );
+    await writeExecutable(
+      `${bin}/which`,
+      '#!/bin/sh\nif [ "$1" = "mise" ]; then\n  exit 0\nfi\nexit 1\n',
+    );
+    await writeExecutable(`${bin}/mise`, "#!/bin/sh\nexit 0\n");
+    const installer = new URL("./install.ts", import.meta.url);
+    const command = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-env",
+        installer.pathname,
+        "--skip-symlinks",
+      ],
+      env: {
+        DOTFILES: dotfiles,
+        DOTFILES_TEST_DISABLE_SYSTEM_BREW: "1",
+        HOME: home,
+        PATH: bin,
+        NO_COLOR: "1",
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code === 0, `installer failed: ${output}`);
+    assert(
+      output.includes("not an Administrator"),
+      `expected non-admin warning, got: ${output}`,
+    );
+    assert(
+      !output.includes("Installing Homebrew"),
+      `expected Homebrew bootstrap not to run, got: ${output}`,
+    );
+  },
+});
+
+Deno.test({
   name: "installer --force replaces an existing symlink target",
   ignore: Deno.build.os === "windows",
   async fn() {
