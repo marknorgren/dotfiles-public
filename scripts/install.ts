@@ -181,7 +181,7 @@ async function trustHomebrewTaps(
 ): Promise<void> {
   if (options.dryRun) return;
 
-  for (const tap of ["hashicorp/tap"]) {
+  for (const tap of ["1password/tap", "hashicorp/tap"]) {
     try {
       await run([brewCommand, "trust", tap]);
     } catch (error) {
