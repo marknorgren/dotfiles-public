@@ -51,12 +51,12 @@ install_deno() {
             brew install deno
         else
             log_info "Installing via curl..."
-            curl -fsSL https://deno.land/install.sh | sh
+            curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path
             export PATH="$HOME/.deno/bin:$PATH"
         fi
     else
         log_info "Installing via curl..."
-        curl -fsSL https://deno.land/install.sh | sh
+        curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path
         export PATH="$HOME/.deno/bin:$PATH"
     fi
 
