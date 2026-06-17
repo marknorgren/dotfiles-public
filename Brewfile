@@ -88,6 +88,7 @@ brew "watchman"  # File watcher
 
 # Development Applications
 cask "visual-studio-code"
+cask "zed"
 cask "sublime-text"
 cask "iterm2"
 cask "warp"

@@ -152,16 +152,42 @@ async function installHomebrew(
     return;
   }
 
+  await trustHomebrewTaps(brewCommand, options);
+
   // Install from Brewfile
   const brewfilePath = `${paths.dotfiles}/Brewfile`;
   try {
     await Deno.stat(brewfilePath);
-    log.step("Installing packages from Brewfile...");
-    if (!options.dryRun) {
-      await run([brewCommand, "bundle", "--file", brewfilePath]);
-    }
   } catch {
     log.warn("No Brewfile found, skipping");
+    return;
+  }
+
+  log.step("Installing packages from Brewfile...");
+  if (!options.dryRun) {
+    try {
+      await run([brewCommand, "bundle", "--file", brewfilePath]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.warn(`Brewfile package installation failed: ${message}`);
+      log.warn("Continuing without completing Brewfile packages");
+    }
+  }
+}
+
+async function trustHomebrewTaps(
+  brewCommand: string,
+  options: InstallOptions,
+): Promise<void> {
+  if (options.dryRun) return;
+
+  for (const tap of ["hashicorp/tap"]) {
+    try {
+      await run([brewCommand, "trust", tap]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.warn(`Unable to trust Homebrew tap ${tap}: ${message}`);
+    }
   }
 }
 
