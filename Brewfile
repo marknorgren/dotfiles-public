@@ -110,7 +110,8 @@ brew "tailscale"  # VPN client
 brew "hashicorp/tap/terraform"  # HashiCorp's official Terraform package
 
 # Languages and runtime tooling
-brew "node"  # JavaScript runtime
+# node + pnpm are managed by mise (see .tool-versions), not Homebrew,
+# so versions can be pinned per-project and match each repo's packageManager.
 brew "python@3.12"  # Python runtime
 brew "go"  # Go language
 brew "ruby"  # Ruby language
