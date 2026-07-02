@@ -1,0 +1,49 @@
+# CI for dotfiles-public: runs the repo's own quality gates.
+#
+#   just check       -> deno fmt --check, deno lint, deno check (typecheck),
+#                       deno test, plus bash -n + shellcheck on the shell
+#                       entry points (install, bin/devcontainer-stack,
+#                       scripts/container-check.sh, .devcontainer/post-create.sh,
+#                       .macos) — same command contributors run locally.
+#   gitleaks action  -> CI counterpart of `just public-scan` (secret scan).
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: just check (deno + shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: extractions/setup-just@v3
+
+      # shellcheck is preinstalled on ubuntu-latest runners; `just check`
+      # runs `deno task check` (fmt, lint, typecheck, test) and the
+      # shell-check recipe.
+      - name: Run repo quality gate
+        run: just check
+
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan commits, not just the checkout.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
