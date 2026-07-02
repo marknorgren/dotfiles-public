@@ -39,7 +39,6 @@ brew "vim"
 brew "grep"
 
 # Development tools
-brew "ack"
 brew "git"
 brew "imagemagick"
 brew "lynx"
@@ -68,11 +67,9 @@ brew "fd"  # Better find
 brew "git-delta"  # Better git diff
 brew "lazygit"  # Terminal UI for git
 brew "jq"  # JSON processor
-brew "htop"  # Process viewer
 brew "btop"  # System monitor
 brew "cloc"  # Code line counter
 brew "scc"  # Code counter
-brew "sloc"  # Code counter
 brew "terminal-notifier"  # macOS notifications
 
 # Development Tools (Pre-Xcode)
