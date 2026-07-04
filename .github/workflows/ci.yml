@@ -25,7 +25,10 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          # Pinned to the 2.8 line to match the local toolchain — deno fmt
+          # output changes between minor versions, and the fmt --check gate
+          # must agree with what contributors run locally.
+          deno-version: "~2.8"
 
       - uses: extractions/setup-just@v3
 
