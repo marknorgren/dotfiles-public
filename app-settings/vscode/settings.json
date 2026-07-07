@@ -10,8 +10,12 @@
   "editor.formatOnSave": true,
   "terminal.integrated.suggest.enabled": true,
   "[markdown]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "prettier.printWidth": 80,
+    "prettier.proseWrap": "always"
   },
+  "prettier.proseWrap": "always",
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   }

@@ -13,14 +13,9 @@
   "languages": {
     "TypeScript": {
       "format_on_save": "on",
-      "formatter": {
-        "external": {
-          "command": "prettier",
-          "arguments": [
-            "--stdin-filepath",
-            "{buffer_path}"
-          ]
-        }
+      "formatter": "prettier",
+      "prettier": {
+        "allowed": true
       }
     },
     "CSharp": {
@@ -39,14 +34,12 @@
     },
     "Markdown": {
       "format_on_save": "on",
-      "formatter": {
-        "external": {
-          "command": "prettier",
-          "arguments": [
-            "--stdin-filepath",
-            "{buffer_path}"
-          ]
-        }
+      "remove_trailing_whitespace_on_save": true,
+      "formatter": "prettier",
+      "prettier": {
+        "allowed": true,
+        "printWidth": 80,
+        "proseWrap": "always"
       }
     }
   },
