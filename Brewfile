@@ -35,7 +35,7 @@ brew "bash"
 
 # Essential tools
 brew "wget"
-brew "vim"
+brew "neovim"  # Modern Vim (system /usr/bin/vim remains as fallback)
 brew "grep"
 
 # Development tools
@@ -67,16 +67,15 @@ brew "fd"  # Better find
 brew "git-delta"  # Better git diff
 brew "lazygit"  # Terminal UI for git
 brew "jq"  # JSON processor
-brew "btop"  # System monitor
-brew "cloc"  # Code line counter
-brew "scc"  # Code counter
+brew "btop"  # System monitor (supersedes htop)
+brew "scc"  # Code counter (supersedes cloc/sloc)
 brew "terminal-notifier"  # macOS notifications
 
 # Development Tools (Pre-Xcode)
 brew "gh"  # GitHub CLI
 brew "git-lfs"  # Git large file storage
 brew "git-cliff"  # Changelog generator
-brew "git-secrets"  # Secrets scanner
+brew "gitleaks"  # Secrets scanner, backs `just public-scan` (supersedes git-secrets)
 brew "gnupg"  # GNU Privacy Guard
 brew "mise"  # Runtime version manager
 brew "shellcheck"  # Shell script linter
@@ -89,8 +88,9 @@ cask "zed"
 cask "sublime-text"
 cask "iterm2"
 cask "warp"
+cask "ghostty"  # Terminal; config is symlinked to ~/.config/ghostty
 cask "xcodes-app"  # Install this first to manage Xcode
-cask "docker-desktop"
+cask "orbstack"  # Docker/Linux VMs (faster and lighter than Docker Desktop)
 cask "fork"
 cask "proxyman"
 cask "dbeaver-community"
@@ -110,13 +110,13 @@ brew "tailscale"  # VPN client
 brew "hashicorp/tap/terraform"  # HashiCorp's official Terraform package
 
 # Languages and runtime tooling
-# node + pnpm are managed by mise (see .tool-versions), not Homebrew,
-# so versions can be pinned per-project and match each repo's packageManager.
-brew "python@3.12"  # Python runtime
+# Runtime versions (node, python, ruby, java, dotnet) are managed by mise
+# (see .tool-versions), not Homebrew, so versions pin per-project and match each
+# repo's packageManager. A second brew copy of a runtime would shadow the mise
+# shim on PATH, so only toolchain installers and Go live here.
 brew "go"  # Go language
-brew "ruby"  # Ruby language
 brew "rustup-init"  # Rust toolchain installer (preferred over direct rust installation)
-brew "uv"  # Fast Python package installer
+brew "uv"  # Fast Python package installer and virtualenv manager
 
 # iOS & macOS Development
 brew "mint"  # Swift package manager

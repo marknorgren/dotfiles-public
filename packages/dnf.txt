@@ -12,8 +12,9 @@ fd-find
 ripgrep
 fzf
 jq
+git-delta
 tree
-htop
+btop
 
 # Development essentials
 git
