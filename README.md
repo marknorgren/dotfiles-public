@@ -52,6 +52,15 @@ private app preferences.
 
 Optional GUI apps live in `Brewfile.apps` and install with `just install-apps`.
 
+## Tool Choices
+
+Runtimes (node, python, ruby, java, dotnet) are managed by `mise` from
+`.tool-versions`, not Homebrew, so a brew copy does not shadow the mise shim on
+PATH. Python packaging goes through `uv`.
+
+Reference: [tool alternatives and rationale](docs/tool-alternatives.md), which
+records what each tool replaced and how to migrate an existing machine.
+
 ## Private Setup Boundary
 
 Do not put secrets, private hostnames, work account config, or machine-specific
