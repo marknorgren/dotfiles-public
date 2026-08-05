@@ -6,6 +6,11 @@
 #                       scripts/container-check.sh, .devcontainer/post-create.sh,
 #                       .macos) — same command contributors run locally.
 #   gitleaks action  -> CI counterpart of `just public-scan` (secret scan).
+#
+# Third-party actions are pinned to a commit SHA, not a moving tag: a tag can be
+# repointed at new code by whoever owns the action. The trailing comment records
+# the version each SHA corresponded to. Bump with the SHA and the comment
+# together.
 name: CI
 
 on:
@@ -21,16 +26,16 @@ jobs:
     name: just check (deno + shellcheck)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
         with:
           # Pinned to the 2.8 line to match the local toolchain — deno fmt
           # output changes between minor versions, and the fmt --check gate
           # must agree with what contributors run locally.
           deno-version: "~2.8"
 
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3.1.0
 
       # shellcheck is preinstalled on ubuntu-latest runners; `just check`
       # runs `deno task check` (fmt, lint, typecheck, test) and the
@@ -42,11 +47,11 @@ jobs:
     name: gitleaks (secret scan)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Full history so gitleaks can scan commits, not just the checkout.
           fetch-depth: 0
 
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
