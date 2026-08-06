@@ -275,3 +275,64 @@ Deno.test("the installer pins the same Deno line CI pins", async () => {
     `install pins Deno ${pin[1]} but CI pins "${ciPin[1]}"`,
   );
 });
+
+/** Run bin/verify with a controlled PATH and return its report. */
+async function runVerify(pathPrefix?: string): Promise<string> {
+  const env: Record<string, string> = {
+    HOME: Deno.env.get("HOME") ?? "/tmp",
+    PATH: pathPrefix
+      ? `${pathPrefix}:${Deno.env.get("PATH")}`
+      : Deno.env.get("PATH") ?? "/usr/bin:/bin",
+    VERIFY_INSTALLED: "1",
+  };
+  const command = new Deno.Command(`${repoRoot}bin/verify`, {
+    cwd: repoRoot,
+    clearEnv: true,
+    env,
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const { stdout } = await command.output();
+  return new TextDecoder().decode(stdout);
+}
+
+Deno.test({
+  name: "verify reports on the tools mise owns",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const bin = `${root}/bin`;
+    await Deno.mkdir(bin, { recursive: true });
+    for (const tool of ["delta", "fzf"]) {
+      await Deno.writeTextFile(`${bin}/${tool}`, "#!/bin/sh\nexit 0\n");
+      await Deno.chmod(`${bin}/${tool}`, 0o755);
+    }
+
+    const report = await runVerify(bin);
+    // git-delta is the configured git pager and fzf supplies the key bindings,
+    // so a setup missing either is broken in a way verify should surface.
+    for (const tool of ["delta", "fzf"]) {
+      assert(
+        /^[✓✗⊘] .*/m.test(report) && report.includes(tool),
+        `bin/verify never mentions ${tool}:\n${report}`,
+      );
+      assert(
+        report.includes(`✓ ${tool}`),
+        `bin/verify did not pass ${tool} while it was on PATH:\n${report}`,
+      );
+    }
+  },
+});
+
+Deno.test({
+  name: "verify fails when a mise-managed tool is missing",
+  // Only meaningful while delta is genuinely absent from this machine's PATH.
+  ignore: await onPath("delta"),
+  async fn() {
+    const report = await runVerify();
+    assert(
+      report.includes("✗ delta"),
+      `bin/verify reported no failure for a missing delta:\n${report}`,
+    );
+  },
+});
