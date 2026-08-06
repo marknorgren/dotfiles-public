@@ -94,3 +94,77 @@ Deno.test({
     );
   },
 });
+
+/**
+ * Resolve an .editorconfig property for a path the way an editor would: walk
+ * the sections in order and let the last matching one win.
+ */
+async function editorconfigProperty(
+  fileName: string,
+  property: string,
+): Promise<string | undefined> {
+  const contents = await Deno.readTextFile(`${repoRoot}/.editorconfig`);
+  let matches = false;
+  let value: string | undefined;
+
+  for (const raw of contents.split("\n")) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) continue;
+
+    const section = line.match(/^\[(.+)\]$/);
+    if (section) {
+      matches = new RegExp(
+        `^${
+          section[1]
+            .replace(/[.+^$()|\\]/g, "\\$&")
+            .replace(/\{([^}]+)\}/g, (_, group: string) =>
+              `(${group.split(",").join("|")})`)
+            .replace(/\*/g, "[^/]*")
+        }$`,
+      ).test(fileName);
+      continue;
+    }
+
+    const [key, ...rest] = line.split("=");
+    if (matches && key.trim() === property) value = rest.join("=").trim();
+  }
+
+  return value;
+}
+
+Deno.test("editorconfig agrees with deno fmt about TypeScript indentation", async () => {
+  const declared = await editorconfigProperty("install.ts", "indent_size");
+  assert(declared !== undefined, ".editorconfig sets no indent_size for .ts");
+
+  // Ask deno fmt what it actually produces rather than assuming its default.
+  const root = await Deno.makeTempDir();
+  const sample = `${root}/sample.ts`;
+  await Deno.writeTextFile(
+    sample,
+    "export function example(): number {\nreturn 1;\n}\n",
+  );
+  const format = new Deno.Command(Deno.execPath(), {
+    args: ["fmt", "--quiet", sample],
+    stdout: "null",
+    stderr: "piped",
+  });
+  const { code, stderr } = await format.output();
+  assert(code === 0, new TextDecoder().decode(stderr));
+
+  const formatted = await Deno.readTextFile(sample);
+  const indented = formatted.split("\n").find((line) =>
+    /^\s+return/.test(line)
+  );
+  assert(
+    indented !== undefined,
+    `deno fmt produced no indented line:\n${formatted}`,
+  );
+  const actual = indented.length - indented.trimStart().length;
+
+  assert(
+    Number(declared) === actual,
+    `.editorconfig declares indent_size=${declared} for TypeScript but ` +
+      `deno fmt writes ${actual} spaces, so an editor honouring .editorconfig ` +
+      `produces diffs that \`just check\` rejects`,
+  );
+});

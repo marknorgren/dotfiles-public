@@ -14,3 +14,8 @@ trim_trailing_whitespace = true
 # Markdown is owned by Prettier (2-space JSON code blocks, 80-col wrap).
 [*.md]
 indent_size = 2
+
+# deno fmt owns these and writes 2-space indentation. An editor that indents
+# them at 4 produces diffs `just check` rejects, so the two must agree.
+[*.{ts,tsx,js,jsx,mjs,json,jsonc,yml,yaml}]
+indent_size = 2
