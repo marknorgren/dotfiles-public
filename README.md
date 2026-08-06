@@ -54,7 +54,7 @@ Optional GUI apps live in `Brewfile.apps` and install with `just install-apps`.
 
 ## Tool Choices
 
-Runtimes (node, python, ruby, java, dotnet) are managed by `mise` from
+Runtimes (Node.js, Python, Ruby, and .NET) are managed by `mise` from
 `.tool-versions`, not Homebrew, so a brew copy does not shadow the mise shim on
 PATH. Python packaging goes through `uv`.
 
