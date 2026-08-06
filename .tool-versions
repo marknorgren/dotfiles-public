@@ -3,11 +3,11 @@ node 22
 # stale (it looks for pnpm-macos-arm64; pnpm now ships pnpm-darwin-arm64.tar.gz),
 # so `mise install` fails on Apple silicon with the default backend.
 npm:pnpm 10.13.1
-github:dandavison/delta 0.18.2
+github:dandavison/delta 0.19.2
 # Formatting can differ between shfmt versions, so this must stay equal to
 # SHFMT_VERSION in .github/workflows/ci.yml; a test enforces that.
 shfmt 3.13.1
-github:junegunn/fzf 0.72.0
+github:junegunn/fzf 0.74.2
 python 3.12
 ruby 3.3.6
 dotnet 9.0.306
