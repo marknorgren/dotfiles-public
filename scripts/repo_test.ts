@@ -196,3 +196,40 @@ Deno.test("git normalises line endings for the scripts this repo ships", async (
     );
   }
 });
+
+Deno.test("pinned action SHAs have an update path", async () => {
+  // Pinning to a commit SHA removes the automatic updates a moving tag gave
+  // us, so something has to propose the bumps or the pins quietly rot.
+  const workflowDir = `${repoRoot}.github/workflows`;
+  const pinned: string[] = [];
+  for await (const entry of Deno.readDir(workflowDir)) {
+    if (!entry.isFile || !/\.ya?ml$/.test(entry.name)) continue;
+    const workflow = await Deno.readTextFile(`${workflowDir}/${entry.name}`);
+    for (const line of workflow.split("\n")) {
+      if (/uses:\s*\S+@[0-9a-f]{40}\b/.test(line)) pinned.push(line.trim());
+    }
+  }
+
+  if (pinned.length === 0) return;
+
+  let config: string;
+  try {
+    config = await Deno.readTextFile(`${repoRoot}.github/dependabot.yml`);
+  } catch {
+    throw new Error(
+      `${pinned.length} action(s) are pinned to a SHA but .github/dependabot.yml ` +
+        `does not exist, so nothing will ever bump them:\n  ${
+          pinned.join("\n  ")
+        }`,
+    );
+  }
+
+  assert(
+    /package-ecosystem:\s*["']?github-actions["']?/.test(config),
+    "dependabot.yml has no github-actions ecosystem entry",
+  );
+  assert(
+    /directory:\s*["']?\/["']?/.test(config),
+    'the github-actions entry must use directory "/" to cover .github/workflows',
+  );
+});
