@@ -1,0 +1,12 @@
+# Normalise line endings in the repository regardless of each contributor's
+# core.autocrlf setting. This repo ships shell scripts (install, .macos, bin/*)
+# that a CRLF checkout breaks on the shebang line.
+* text=auto eol=lf
+
+# Binary files git should never try to normalise or diff as text.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary

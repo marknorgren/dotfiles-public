@@ -168,3 +168,31 @@ Deno.test("editorconfig agrees with deno fmt about TypeScript indentation", asyn
       `produces diffs that \`just check\` rejects`,
   );
 });
+
+Deno.test("git normalises line endings for the scripts this repo ships", async () => {
+  // The installer, the macOS defaults script, and bin/* are executed by a
+  // shell. A CRLF checkout makes them fail on the shebang line, so the repo
+  // must pin normalisation rather than rely on each contributor's core.autocrlf.
+  const paths = ["install", ".macos", "bin/verify", "scripts/install.ts"];
+  const command = new Deno.Command("git", {
+    args: ["check-attr", "text", "eol", "--", ...paths],
+    cwd: repoRoot,
+    stdout: "piped",
+    stderr: "piped",
+  });
+
+  const { code, stdout, stderr } = await command.output();
+  assert(code === 0, new TextDecoder().decode(stderr));
+  const attributes = new TextDecoder().decode(stdout);
+
+  for (const path of paths) {
+    assert(
+      attributes.includes(`${path}: text: auto`),
+      `${path} has no "text=auto" attribute:\n${attributes}`,
+    );
+    assert(
+      attributes.includes(`${path}: eol: lf`),
+      `${path} has no "eol=lf" attribute:\n${attributes}`,
+    );
+  }
+});
