@@ -61,6 +61,9 @@ and this project adheres to
   fresh machine format code the gate then rejected.
 - `.editorconfig` declares 2-space indentation for the files deno fmt owns. It
   declared 4, so an editor honouring it produced diffs `just check` rejected.
+- shfmt is pinned in `.tool-versions` instead of installed by Homebrew, so the
+  version `just check` uses matches the one CI installs. Formatting can change
+  between shfmt versions, and Homebrew always installs the current release.
 
 ### Changed
 

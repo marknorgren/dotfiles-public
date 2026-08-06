@@ -336,3 +336,26 @@ Deno.test({
     );
   },
 });
+
+Deno.test("the shfmt CI pin matches the one mise installs", async () => {
+  // shfmt formatting can differ between versions, so a contributor running
+  // `just check` locally must use the same build CI enforces with.
+  const toolVersions = await Deno.readTextFile(`${repoRoot}.tool-versions`);
+  const local = toolVersions.match(/^(?:\S+:)?shfmt\s+(\S+)$/m);
+  assert(
+    local !== null,
+    ".tool-versions does not pin shfmt, so a local install can format " +
+      "differently from the version CI enforces",
+  );
+
+  const workflow = await Deno.readTextFile(
+    `${repoRoot}.github/workflows/ci.yml`,
+  );
+  const ci = workflow.match(/SHFMT_VERSION:\s*v?(\S+)/);
+  assert(ci !== null, "ci.yml does not pin SHFMT_VERSION");
+
+  assert(
+    local[1] === ci[1],
+    `.tool-versions pins shfmt ${local[1]} but CI installs ${ci[1]}`,
+  );
+});

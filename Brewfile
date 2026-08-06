@@ -78,7 +78,6 @@ brew "gitleaks"  # Secrets scanner, backs `just public-scan` (supersedes git-sec
 brew "gnupg"  # GNU Privacy Guard
 brew "mise"  # Runtime version manager
 brew "shellcheck"  # Shell script linter
-brew "shfmt"  # Shell script formatter, pairs with shellcheck
 brew "cmake"  # Build system
 brew "mas"  # Mac App Store CLI, lets brew bundle cover App Store installs
 
@@ -109,7 +108,7 @@ brew "tailscale"  # VPN client
 brew "hashicorp/tap/terraform"  # HashiCorp's official Terraform package
 
 # Languages and runtime tooling
-# Runtime versions, git-delta, and fzf are managed by mise
+# Runtime versions, git-delta, fzf, and shfmt are managed by mise
 # (see .tool-versions), not Homebrew, so versions pin per-project and match each
 # repo's packageManager. A second brew copy of a runtime would shadow the mise
 # shim on PATH, so only toolchain installers and Go live here.

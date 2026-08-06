@@ -102,17 +102,19 @@ stacks: `base`, `deno`, `node-pnpm`, `python-uv`, `go`, `dotnet`, and `infra`.
 
 Running the repo's own checks needs these on PATH:
 
-| Tool         | Used by                        |
-| ------------ | ------------------------------ |
-| `just`       | every recipe                   |
-| `deno`       | `just check`, the installer    |
-| `shellcheck` | `just check`, `just lint`      |
-| `shfmt`      | `just check`, `just shell-fmt` |
-| `gitleaks`   | `just public-scan`             |
+| Tool         | Used by                        | Installed by             |
+| ------------ | ------------------------------ | ------------------------ |
+| `just`       | every recipe                   | Homebrew, distro package |
+| `deno`       | `just check`, the installer    | `./install`              |
+| `shellcheck` | `just check`, `just lint`      | Homebrew, distro package |
+| `shfmt`      | `just check`, `just shell-fmt` | `mise install`           |
+| `gitleaks`   | `just public-scan`             | Homebrew, distro package |
 
-On macOS, `brew bundle` installs all five. On Linux, install them with the
-distro package manager or from each project's releases. `./install` itself needs
-none of them: it installs Deno and then runs the TypeScript installer.
+`shfmt` is pinned in `.tool-versions` rather than installed by a package
+manager, because its formatting can change between versions and `just check`
+must agree with CI. `./install` needs none of these: it installs Deno and then
+runs the TypeScript installer, which trusts `.tool-versions` and runs
+`mise install`.
 
 ## License
 

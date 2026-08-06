@@ -96,6 +96,7 @@ echo ""
 echo "🧰 mise-managed Tools:"
 test_tool delta "git pager, see .gitconfig"
 test_tool fzf "Ctrl-R and Ctrl-T key bindings"
+test_tool shfmt "shell formatter, see just check"
 echo ""
 
 # Shell wiring that other parts of the setup depend on.

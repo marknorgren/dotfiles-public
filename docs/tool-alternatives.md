@@ -69,13 +69,13 @@ separately before choosing between them.
 
 ## Added
 
-| Tool                                             | Why                                                                                                  |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Adds inline history suggestions and syntax highlighting. Both load only when a terminal is attached. |
-| `hyperfine`                                      | Benchmarks commands with warmup runs and summary statistics.                                         |
-| `shfmt`                                          | A formatter to pair with `shellcheck`. The repo linted shell but never formatted it.                 |
-| `yq`                                             | `jq` for YAML and XML, useful for workflow and configuration files.                                  |
-| `mas`                                            | The Mac App Store CLI, so `brew bundle` can cover App Store installs such as Xcode.                  |
+| Tool                                             | Why                                                                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Adds inline history suggestions and syntax highlighting. Both load only when a terminal is attached.                                                          |
+| `hyperfine`                                      | Benchmarks commands with warmup runs and summary statistics.                                                                                                  |
+| `shfmt`                                          | A formatter to pair with `shellcheck`. Pinned in `.tool-versions`, not Homebrew: formatting can change between versions, and `just check` must agree with CI. |
+| `yq`                                             | `jq` for YAML and XML, useful for workflow and configuration files.                                                                                           |
+| `mas`                                            | The Mac App Store CLI, so `brew bundle` can cover App Store installs such as Xcode.                                                                           |
 
 ## Terraform and the HashiCorp tap
 

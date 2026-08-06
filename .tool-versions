@@ -4,6 +4,9 @@ node 22
 # so `mise install` fails on Apple silicon with the default backend.
 npm:pnpm 10.13.1
 github:dandavison/delta 0.18.2
+# Formatting can differ between shfmt versions, so this must stay equal to
+# SHFMT_VERSION in .github/workflows/ci.yml; a test enforces that.
+shfmt 3.13.1
 github:junegunn/fzf 0.72.0
 python 3.12
 ruby 3.3.6
