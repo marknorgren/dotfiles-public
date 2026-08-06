@@ -92,3 +92,8 @@ just devcontainer-shell node-pnpm ~/working/example
 Docker. `just devcontainer-init` writes a reusable `.devcontainer/` for common
 stacks: `base`, `deno`, `node-pnpm`, `python-uv`, `go`, `dotnet`, and `infra`.
 `just lint` runs Deno lint and checks the macOS settings script.
+`just shell-fmt` applies the shell formatting `just check` enforces.
+
+## License
+
+[MIT](LICENSE).
