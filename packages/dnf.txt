@@ -4,15 +4,15 @@
 
 # Shell & terminal
 zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
 tmux
 
 # Modern CLI tools
 bat
 fd-find
 ripgrep
-fzf
 jq
-git-delta
 tree
 btop
 

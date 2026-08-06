@@ -41,34 +41,33 @@ brew "grep"
 # Development tools
 brew "git"
 brew "imagemagick"
-brew "lynx"
 brew "nmap"
-brew "p7zip"
 brew "pigz"
 brew "pv"
-brew "rename"
+brew "sevenzip"  # Official 7-Zip (p7zip is a fork frozen at the 2016 sources)
 brew "tree"
-brew "zopfli"
 
 # Shell and Terminal
 brew "zsh"
 brew "starship"  # Shell prompt
-brew "fzf"  # Fuzzy finder
 brew "zoxide"  # Smarter cd
 brew "just"  # Command runner
 brew "direnv"  # Directory-specific envs
 brew "dash"  # POSIX shell
+brew "zsh-autosuggestions"  # Suggest completions from history
+brew "zsh-syntax-highlighting"  # Highlight the command line as you type
 
 # Modern CLI Tools
 brew "bat"  # Better cat
 brew "eza"  # Modern ls (replacement for deprecated exa)
 brew "ripgrep"  # Better grep
 brew "fd"  # Better find
-brew "git-delta"  # Better git diff
 brew "lazygit"  # Terminal UI for git
 brew "jq"  # JSON processor
+brew "yq"  # YAML/XML processor, jq's counterpart
 brew "btop"  # System monitor (supersedes htop)
 brew "scc"  # Code counter (supersedes cloc/sloc)
+brew "hyperfine"  # Command-line benchmarking with warmup and stats
 brew "terminal-notifier"  # macOS notifications
 
 # Development Tools (Pre-Xcode)
@@ -79,18 +78,18 @@ brew "gitleaks"  # Secrets scanner, backs `just public-scan` (supersedes git-sec
 brew "gnupg"  # GNU Privacy Guard
 brew "mise"  # Runtime version manager
 brew "shellcheck"  # Shell script linter
+brew "shfmt"  # Shell script formatter, pairs with shellcheck
 brew "cmake"  # Build system
-brew "watchman"  # File watcher
+brew "mas"  # Mac App Store CLI, lets brew bundle cover App Store installs
 
 # Development Applications
 cask "visual-studio-code"
 cask "zed"
 cask "sublime-text"
-cask "iterm2"
 cask "warp"
 cask "ghostty"  # Terminal; config is symlinked to ~/.config/ghostty
 cask "xcodes-app"  # Install this first to manage Xcode
-cask "orbstack"  # Docker/Linux VMs (faster and lighter than Docker Desktop)
+cask "orbstack"  # Docker compatibility and Linux VMs
 cask "fork"
 cask "proxyman"
 cask "dbeaver-community"
@@ -110,7 +109,7 @@ brew "tailscale"  # VPN client
 brew "hashicorp/tap/terraform"  # HashiCorp's official Terraform package
 
 # Languages and runtime tooling
-# Runtime versions (node, python, ruby, java, dotnet) are managed by mise
+# Runtime versions, git-delta, and fzf are managed by mise
 # (see .tool-versions), not Homebrew, so versions pin per-project and match each
 # repo's packageManager. A second brew copy of a runtime would shadow the mise
 # shim on PATH, so only toolchain installers and Go live here.
