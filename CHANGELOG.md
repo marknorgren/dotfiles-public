@@ -10,6 +10,20 @@ and this project adheres to
 
 ### Added
 
+- An MIT `LICENSE`. The README points people at a public installer, so the
+  repository should not be all-rights-reserved by default.
+- `.gitattributes` pinning `* text=auto eol=lf`. The repo ships shell scripts a
+  CRLF checkout breaks on the shebang line.
+- `.github/dependabot.yml`, so the SHA-pinned workflow actions still get
+  updates. A test fails if a pin is added without an update path.
+- Shell formatting via shfmt, enforced by `just check` and applied by
+  `just shell-fmt`. Settings come from `.editorconfig`, so the CLI and editor
+  integrations agree. CI installs the pinned release and verifies its SHA-256.
+- `bin/verify` checks the tools mise owns (git-delta, fzf) and the shell wiring
+  other parts depend on. They are skipped on a plain checkout and required under
+  `VERIFY_INSTALLED=1`.
+- `scripts/repo_test.ts`, covering the secret scan, formatting agreement, line
+  endings, the Deno pin, and Dependabot coverage.
 - git-delta is now configured, not just installed: it is the git pager and
   `interactive.diffFilter`, with `zdiff3` conflict style and moved-line
   coloring. mise installs one pinned release across macOS and Linux.
@@ -34,6 +48,19 @@ and this project adheres to
   is attached. A script-driven `zsh -i -c` skips it, which also avoids the
   "can't change option: zle" warning fzf prints with no terminal.
 - `hyperfine`, `shfmt`, `yq`, and `mas`.
+
+### Fixed
+
+- `.zprofile` activates mise shims, so login and GUI shells can resolve the
+  tools mise owns. Without it, git reported "cannot run delta" everywhere
+  outside an interactive zsh.
+- `just public-scan` scans commit history. It passed `--no-git`, so a secret
+  that was committed and later deleted passed locally and failed in CI.
+- The installer pins the Deno version it fetches. CI pins the toolchain because
+  `deno fmt` output moves between minor versions, so an unpinned bootstrap let a
+  fresh machine format code the gate then rejected.
+- `.editorconfig` declares 2-space indentation for the files deno fmt owns. It
+  declared 4, so an editor honouring it produced diffs `just check` rejected.
 
 ### Changed
 
