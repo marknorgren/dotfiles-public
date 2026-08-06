@@ -239,3 +239,61 @@ printf "CACHE_END='%s'\\n" "$token"
     }
   },
 });
+
+Deno.test({
+  name: "login shells put mise-managed tools on PATH",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    try {
+      await Deno.stat("/bin/zsh");
+    } catch {
+      return;
+    }
+
+    const root = await Deno.makeTempDir();
+    const bin = `${root}/bin`;
+    const shims = `${root}/shims`;
+    const dotfiles = `${root}/dotfiles`;
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(shims, { recursive: true });
+    await Deno.mkdir(dotfiles, { recursive: true });
+    await Deno.copyFile(`${repoRoot}/.zprofile`, `${dotfiles}/.zprofile`);
+    await Deno.copyFile(`${repoRoot}/.exports`, `${dotfiles}/.exports`);
+
+    // `mise activate <shell> --shims` prints a single PATH export. Stand in for
+    // it so the test does not depend on a real mise installation.
+    await writeExecutable(
+      `${bin}/mise`,
+      `#!/bin/sh
+if [ "$1" = "activate" ]; then
+  printf 'export PATH="%s:$PATH"\\n' "${shims}"
+  exit 0
+fi
+exit 1
+`,
+    );
+    // git-delta is configured as the global git pager, so a login shell that
+    // cannot resolve it leaves every git invocation reporting "cannot run delta".
+    await writeExecutable(`${shims}/delta`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command("/bin/zsh", {
+      args: ["-f", "-c", 'source "$DOTFILES/.zprofile"; command -v delta'],
+      clearEnv: true,
+      env: {
+        DOTFILES: dotfiles,
+        HOME: root,
+        PATH: `${bin}:/usr/bin:/bin`,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const resolved = new TextDecoder().decode(stdout).trim();
+    assert(code === 0, new TextDecoder().decode(stderr));
+    assert(
+      resolved === `${shims}/delta`,
+      `login shell resolved delta to "${resolved}", expected the mise shim`,
+    );
+  },
+});
