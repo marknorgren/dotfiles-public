@@ -6,6 +6,12 @@ set -euo pipefail
 REPO_URL="${DOTFILES_REPO:-https://github.com/marknorgren/dotfiles-public.git}"
 TARGET_DIR="${DOTFILES_TARGET:-$HOME/.dotfiles-public}"
 
+# Deno version this repo is developed and tested against. `deno fmt` output
+# changes between minor versions, so an unpinned bootstrap lets a fresh machine
+# format code that the pinned CI gate then rejects. Keep this on the same line
+# as deno-version in .github/workflows/ci.yml; a test enforces that.
+DENO_VERSION="v2.8.3"
+
 script_path="${BASH_SOURCE[0]:-$0}"
 if [[ "$script_path" == "-" || "$script_path" == "bash" ]]; then
     DOTFILES_DIR="$PWD"
@@ -50,21 +56,14 @@ install_deno() {
     log_header "Installing Deno"
     ensure_deno_archive_tool
 
-    if [[ "$(detect_platform)" == "macos" ]]; then
-        # Try Homebrew first on macOS
-        if command -v brew &> /dev/null; then
-            log_info "Installing via Homebrew..."
-            brew install deno
-        else
-            log_info "Installing via curl..."
-            curl -fsSL https://deno.land/install.sh | CI=1 sh -s -- --no-modify-path
-            export PATH="$HOME/.deno/bin:$PATH"
-        fi
-    else
-        log_info "Installing via curl..."
-        curl -fsSL https://deno.land/install.sh | CI=1 sh -s -- --no-modify-path
-        export PATH="$HOME/.deno/bin:$PATH"
-    fi
+    # The official installer takes the version as its first positional
+    # argument. It is used on both platforms rather than `brew install deno` on
+    # macOS, because Homebrew always installs the current release and would
+    # defeat the pin. Nothing else in this repo expects a brew-managed Deno.
+    log_info "Installing Deno $DENO_VERSION..."
+    curl -fsSL https://deno.land/install.sh |
+        CI=1 sh -s -- --no-modify-path "$DENO_VERSION"
+    export PATH="$HOME/.deno/bin:$PATH"
 
     log_success "Deno installed: $(deno --version | head -1)"
 }

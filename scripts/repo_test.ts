@@ -233,3 +233,45 @@ Deno.test("pinned action SHAs have an update path", async () => {
     'the github-actions entry must use directory "/" to cover .github/workflows',
   );
 });
+
+Deno.test("the installer pins the same Deno line CI pins", async () => {
+  // `deno fmt` output changes between minor versions, so CI pins the toolchain.
+  // A bootstrap that fetches whatever is current lets a fresh machine format
+  // code the pinned CI gate then rejects.
+  const installer = await Deno.readTextFile(`${repoRoot}install`);
+
+  const pin = installer.match(/^DENO_VERSION="(v[0-9]+\.[0-9]+\.[0-9]+)"/m);
+  assert(
+    pin !== null,
+    'install does not define DENO_VERSION="vX.Y.Z", so the bootstrap takes ' +
+      "whatever version is current",
+  );
+
+  // Join shell line continuations so a pipeline split across lines is checked
+  // as the single statement it is.
+  const statements = installer
+    .replace(/(\||\\)\n\s*/g, "$1 ")
+    .split("\n");
+
+  for (const statement of statements) {
+    if (!statement.includes("deno.land/install.sh")) continue;
+    assert(
+      statement.includes("$DENO_VERSION") ||
+        statement.includes("${DENO_VERSION}"),
+      `installer fetches Deno without the pin: ${statement.trim()}`,
+    );
+  }
+
+  const workflow = await Deno.readTextFile(
+    `${repoRoot}.github/workflows/ci.yml`,
+  );
+  const ciPin = workflow.match(/deno-version:\s*"([^"]+)"/);
+  assert(ciPin !== null, "ci.yml does not pin deno-version");
+
+  // CI pins a range such as "~2.8"; the installer must sit inside it.
+  const ciLine = ciPin[1].replace(/^[~^]/, "");
+  assert(
+    pin[1].slice(1).startsWith(`${ciLine}.`),
+    `install pins Deno ${pin[1]} but CI pins "${ciPin[1]}"`,
+  );
+});
