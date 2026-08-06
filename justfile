@@ -55,9 +55,22 @@ macos-check:
     bash -n .macos
     shellcheck --shell=bash -x .macos
 
+SHELL_SOURCES := "install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos"
+
 shell-check:
-    bash -n install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos
-    shellcheck --shell=bash -x install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos
+    bash -n {{SHELL_SOURCES}}
+    shellcheck --shell=bash -x {{SHELL_SOURCES}}
+    @just shell-fmt-check
+
+# shfmt takes its settings from .editorconfig (indent_style, indent_size,
+# switch_case_indent), so the CLI and any editor integration agree.
+shell-fmt-check:
+    @command -v shfmt >/dev/null 2>&1 || { echo "shfmt is not installed. Run 'brew bundle' on macOS, or install shfmt from https://github.com/mvdan/sh" >&2; exit 1; }
+    shfmt --diff {{SHELL_SOURCES}}
+
+# Apply the formatting shell-fmt-check enforces.
+shell-fmt:
+    shfmt --write {{SHELL_SOURCES}}
 
 # Secret scan. Scans commit history as well as the working tree, matching the
 # CI job; `--no-git` would pass on a secret that is already committed.

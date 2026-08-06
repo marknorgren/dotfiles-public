@@ -37,6 +37,21 @@ jobs:
 
       - uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b # v3.1.0
 
+      # shfmt is not on the runner image. Install the pinned release and verify
+      # it, rather than adding another third-party action to trust.
+      - name: Install shfmt
+        env:
+          SHFMT_VERSION: v3.13.1
+          SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  /tmp/shfmt" | sha256sum --check --strict
+          chmod +x /tmp/shfmt
+          sudo mv /tmp/shfmt /usr/local/bin/shfmt
+          shfmt --version
+
       # shellcheck is preinstalled on ubuntu-latest runners; `just check`
       # runs `deno task check` (fmt, lint, typecheck, test) and the
       # shell-check recipe.

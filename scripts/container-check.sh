@@ -5,9 +5,9 @@ image="${DOTFILES_DEVCONTAINER_IMAGE:-dotfiles-public-devcontainer:local}"
 
 docker build -f .devcontainer/Dockerfile -t "$image" .
 docker run --rm \
-  --user vscode \
-  -e DOTFILES=/workspace \
-  -v "$PWD":/workspace \
-  -w /workspace \
-  "$image" \
-  bash .devcontainer/post-create.sh
+    --user vscode \
+    -e DOTFILES=/workspace \
+    -v "$PWD":/workspace \
+    -w /workspace \
+    "$image" \
+    bash .devcontainer/post-create.sh

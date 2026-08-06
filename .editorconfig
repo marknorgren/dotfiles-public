@@ -11,6 +11,10 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+# shfmt reads this for shell scripts (indent_style/indent_size above apply too),
+# so the CLI and any editor integration format them the same way.
+switch_case_indent = true
+
 # Markdown is owned by Prettier (2-space JSON code blocks, 80-col wrap).
 [*.md]
 indent_size = 2
