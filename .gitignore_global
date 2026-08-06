@@ -5,5 +5,8 @@ cursor-rules.json
 # Claude Code settings
 **/.claude/settings.local.json
 
-# Codex local state can contain authentication and session data
-**/.codex/
+# Codex private state. Allow only shareable project config and skills.
+**/.codex/*
+!**/.codex/config.toml
+!**/.codex/skills/
+!**/.codex/skills/**
