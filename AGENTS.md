@@ -7,7 +7,10 @@ work-specific data.
 
 - `./install --dry-run` previews setup.
 - `./install` installs packages and symlinks dotfiles.
-- `just check` type-checks installer code.
+- `just check` is the full gate: Deno format, lint, type-check, and tests, plus
+  `bash -n`, ShellCheck, and shfmt over the shell entry points. It needs `deno`,
+  `shellcheck`, and `shfmt` on PATH; see the README's Toolchain table.
+- `just public-scan` scans the working tree and commit history for secrets.
 - `just container-check` builds the devcontainer image and verifies the
   installer inside Docker.
 - `just devcontainer-list` lists reusable devcontainer stack templates.

@@ -80,19 +80,39 @@ just macos-review
 just setup-macos
 just verify
 just check
+just public-scan
+just shell-fmt
 just container-check
 just devcontainer-list
 just devcontainer-init node-pnpm ~/working/example
 just devcontainer-shell node-pnpm ~/working/example
 ```
 
-`just verify` checks the linked shell files and a few core commands.
-`just check` runs formatting, linting, type-checking, and Deno tests.
+`just verify` checks the linked shell files, the tools mise installs, and a few
+core commands. `just check` runs Deno formatting, linting, type-checking, and
+tests, then `bash -n`, ShellCheck, and shfmt over the shell entry points.
+`just public-scan` scans the working tree and commit history for secrets.
+`just shell-fmt` applies the formatting `just check` enforces.
 `just container-check` builds the devcontainer image and runs the same checks in
 Docker. `just devcontainer-init` writes a reusable `.devcontainer/` for common
 stacks: `base`, `deno`, `node-pnpm`, `python-uv`, `go`, `dotnet`, and `infra`.
 `just lint` runs Deno lint and checks the macOS settings script.
-`just shell-fmt` applies the shell formatting `just check` enforces.
+
+### Toolchain
+
+Running the repo's own checks needs these on PATH:
+
+| Tool         | Used by                        |
+| ------------ | ------------------------------ |
+| `just`       | every recipe                   |
+| `deno`       | `just check`, the installer    |
+| `shellcheck` | `just check`, `just lint`      |
+| `shfmt`      | `just check`, `just shell-fmt` |
+| `gitleaks`   | `just public-scan`             |
+
+On macOS, `brew bundle` installs all five. On Linux, install them with the
+distro package manager or from each project's releases. `./install` itself needs
+none of them: it installs Deno and then runs the TypeScript installer.
 
 ## License
 
