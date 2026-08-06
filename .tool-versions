@@ -1,7 +1,10 @@
 node 22
-# npm: backend, not the default aqua: backend — aqua's pnpm asset template is
+# npm: backend, not the default aqua: backend. Aqua's pnpm asset template is
 # stale (it looks for pnpm-macos-arm64; pnpm now ships pnpm-darwin-arm64.tar.gz),
 # so `mise install` fails on Apple silicon with the default backend.
-npm:pnpm 11.8.0
+npm:pnpm 10.13.1
+github:dandavison/delta 0.18.2
+github:junegunn/fzf 0.72.0
+python 3.12
 ruby 3.3.6
 dotnet 9.0.306

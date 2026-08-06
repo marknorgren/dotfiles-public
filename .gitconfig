@@ -8,10 +8,10 @@
     excludesfile = ~/.gitignore_global
     pager = delta
 
-# git-delta: syntax-highlighted, navigable diffs. Installed by the Brewfile on
-# macOS and packages/{apt,dnf}.txt on Linux. If delta is missing, git reports
-# "cannot run delta" and prints unpaged output — drop these two settings rather
-# than leaving delta uninstalled.
+# git-delta: syntax-highlighted, navigable diffs. Installed cross-platform by
+# mise from .tool-versions. If delta is missing, git reports "cannot run delta"
+# and prints unpaged output. Drop these two settings rather than leaving delta
+# uninstalled.
 [interactive]
     diffFilter = delta --color-only
 

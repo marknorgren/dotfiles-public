@@ -189,7 +189,7 @@ main() {
         scripts/install.ts
     )
 
-    if [[ -r /dev/tty ]]; then
+    if [[ -r /dev/tty ]] && { : < /dev/tty; } 2>/dev/null; then
         "${deno_cmd[@]}" "$@" < /dev/tty
     else
         "${deno_cmd[@]}" "$@"

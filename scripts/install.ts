@@ -230,36 +230,46 @@ async function installLinuxPackages(
 
   if (platform.distro === "debian") {
     const aptFile = `${packagesDir}/apt.txt`;
+    let packages: string[];
     try {
-      const packages = (await Deno.readTextFile(aptFile))
+      packages = (await Deno.readTextFile(aptFile))
         .split("\n")
         .filter((line) => line.trim() && !line.startsWith("#"));
-
-      if (packages.length > 0) {
-        log.step("Installing apt packages...");
-        if (!options.dryRun) {
-          await run(["sudo", "apt", "update"]);
-          await run(["sudo", "apt", "install", "-y", ...packages]);
-        }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        log.warn("No apt.txt found, skipping");
+        return;
       }
-    } catch {
-      log.warn("No apt.txt found, skipping");
+      throw error;
+    }
+
+    if (packages.length > 0) {
+      log.step("Installing apt packages...");
+      if (!options.dryRun) {
+        await run(["sudo", "apt", "update"]);
+        await run(["sudo", "apt", "install", "-y", ...packages]);
+      }
     }
   } else if (platform.distro === "redhat") {
     const dnfFile = `${packagesDir}/dnf.txt`;
+    let packages: string[];
     try {
-      const packages = (await Deno.readTextFile(dnfFile))
+      packages = (await Deno.readTextFile(dnfFile))
         .split("\n")
         .filter((line) => line.trim() && !line.startsWith("#"));
-
-      if (packages.length > 0) {
-        log.step("Installing dnf packages...");
-        if (!options.dryRun) {
-          await run(["sudo", "dnf", "install", "-y", ...packages]);
-        }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        log.warn("No dnf.txt found, skipping");
+        return;
       }
-    } catch {
-      log.warn("No dnf.txt found, skipping");
+      throw error;
+    }
+
+    if (packages.length > 0) {
+      log.step("Installing dnf packages...");
+      if (!options.dryRun) {
+        await run(["sudo", "dnf", "install", "-y", ...packages]);
+      }
     }
   } else {
     log.warn(
@@ -315,6 +325,9 @@ async function installMise(
   if (!options.dryRun) {
     const paths = getPaths(await detectPlatform());
     await run(["mise", "trust", paths.dotfiles], { silent: true });
+
+    log.step("Installing tools from .tool-versions...");
+    await run(["mise", "install"], { cwd: paths.dotfiles });
   }
 }
 
