@@ -59,5 +59,7 @@ shell-check:
     bash -n install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos
     shellcheck --shell=bash -x install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos
 
+# Secret scan. Scans commit history as well as the working tree, matching the
+# CI job; `--no-git` would pass on a secret that is already committed.
 public-scan:
-    gitleaks detect --source . --no-git --redact --verbose
+    gitleaks detect --source . --redact --verbose
