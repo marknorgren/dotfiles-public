@@ -1,4 +1,4 @@
-import { run } from "./log.ts";
+import { run, runLogged } from "./log.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -19,5 +19,38 @@ Deno.test("run rejects when a command exits non-zero", async () => {
   assert(
     thrown.message.includes("exit 7"),
     `expected exit code in error message, got: ${thrown.message}`,
+  );
+});
+
+Deno.test("runLogged preserves output and reports the first storage error", async () => {
+  const root = await Deno.makeTempDir();
+  const logPath = `${root}/command.log`;
+  let thrown: unknown;
+
+  try {
+    await runLogged(
+      [
+        "/bin/sh",
+        "-c",
+        "printf 'starting\\nInput/output error at /private/tmp\\ntrailing noise\\n' >&2; exit 7",
+      ],
+      logPath,
+    );
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert(thrown instanceof Error, "expected runLogged to reject");
+  assert(
+    thrown.message.includes("Input/output error at /private/tmp"),
+    `expected the storage error in the summary, got: ${thrown.message}`,
+  );
+  assert(
+    thrown.message.includes(`Full log: ${logPath}`),
+    `expected the log path in the summary, got: ${thrown.message}`,
+  );
+  assert(
+    (await Deno.readTextFile(logPath)).includes("trailing noise"),
+    "expected the complete command output in the log",
   );
 });

@@ -3,6 +3,40 @@
 # Install with:
 #   brew bundle --file Brewfile.apps
 
+tap "1password/tap"
+
+# Development applications
+cask "visual-studio-code"
+cask "zed"
+cask "sublime-text"
+cask "warp"
+cask "ghostty"
+cask "xcodes-app"
+cask "orbstack"
+cask "fork"
+cask "proxyman"
+cask "dbeaver-community"
+cask "dash"
+
+# Fonts
+cask "font-fira-code"
+cask "font-jetbrains-mono"
+
+# Productivity and utilities
+cask "cleanshot"
+cask "hiddenbar"
+cask "stats"
+
+# Browsers
+cask "google-chrome"
+cask "microsoft-edge"
+cask "firefox"
+
+# 1Password desktop application
+if !File.exist?("/Applications/1Password.app")
+  cask "1password"
+end
+
 # AI and audio tools
 cask "macwhisper"
 cask "lm-studio"

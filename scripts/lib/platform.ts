@@ -17,6 +17,7 @@ export interface PlatformInfo {
 
 export async function detectPlatform(): Promise<PlatformInfo> {
   const os = Deno.build.os;
+  const testPlatform = Deno.env.get("DOTFILES_TEST_PLATFORM");
   const arch = Deno.build.arch === "aarch64"
     ? "arm64"
     : Deno.build.arch === "x86_64"
@@ -33,7 +34,10 @@ export async function detectPlatform(): Promise<PlatformInfo> {
     // Ignore hostname detection failure
   }
 
-  const platform: Platform = os === "darwin"
+  const platform: Platform = testPlatform === "macos" ||
+      testPlatform === "linux"
+    ? testPlatform
+    : os === "darwin"
     ? "macos"
     : os === "linux"
     ? "linux"

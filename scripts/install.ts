@@ -6,8 +6,9 @@
 
 import { detectPlatform, getPaths, type PlatformInfo } from "./lib/platform.ts";
 import { createAllSymlinks } from "./lib/symlink.ts";
-import { commandExists, log, run } from "./lib/log.ts";
+import { commandExists, log, run, runLogged } from "./lib/log.ts";
 import { parseArgs } from "@std/cli/parse-args";
+import { dirname } from "@std/path";
 
 interface InstallOptions {
   dryRun: boolean;
@@ -88,8 +89,12 @@ Options:
   await setupLocalDir(paths, options);
 
   log.header("Done!");
-  log.success("Dotfiles installed successfully");
-  log.info("Restart your shell or run: source ~/.zshrc");
+  if (options.dryRun) {
+    log.success("Dry run completed; no changes were made");
+  } else {
+    log.success("Dotfiles installed successfully");
+    log.info("Restart your shell or run: source ~/.zshrc");
+  }
 }
 
 async function installPackages(
@@ -152,6 +157,8 @@ async function installHomebrew(
     return;
   }
 
+  prependToPath(dirname(brewCommand));
+
   await trustHomebrewTaps(brewCommand, options);
 
   // Install from Brewfile
@@ -165,12 +172,18 @@ async function installHomebrew(
 
   log.step("Installing packages from Brewfile...");
   if (!options.dryRun) {
-    try {
-      await run([brewCommand, "bundle", "--file", brewfilePath]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      log.warn(`Brewfile package installation failed: ${message}`);
-      log.warn("Continuing without completing Brewfile packages");
+    const logPath = `${paths.local}/install-homebrew.log`;
+    await runLogged(
+      [brewCommand, "bundle", "--quiet", "--file", brewfilePath],
+      logPath,
+    );
+
+    for (const command of ["just", "mise"]) {
+      if (!(await commandExists(command))) {
+        throw new Error(
+          `Homebrew completed without the required command "${command}" on PATH`,
+        );
+      }
     }
   }
 }
@@ -192,6 +205,18 @@ async function trustHomebrewTaps(
 }
 
 async function resolveHomebrewCommand(): Promise<string | undefined> {
+  const configuredPath = Deno.env.get("DOTFILES_HOMEBREW_PATH");
+  if (configuredPath) {
+    try {
+      const stat = await Deno.stat(configuredPath);
+      if (stat.isFile) return configuredPath;
+    } catch {
+      throw new Error(
+        `DOTFILES_HOMEBREW_PATH does not point to a file: ${configuredPath}`,
+      );
+    }
+  }
+
   if (await commandExists("brew")) return "brew";
   if (Deno.env.get("DOTFILES_TEST_DISABLE_SYSTEM_BREW") === "1") {
     return undefined;
@@ -396,5 +421,18 @@ export MY_MACHINE_NAME="${await (async () => {
   }
 }
 
-// Run
-await main();
+if (import.meta.main) {
+  try {
+    await main();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error(message);
+    if (/no space left|disk full|input\/output error/i.test(message)) {
+      log.info("Check free space and disk health, then rerun ./install");
+      log.info('Check: df -h / /private/tmp /opt/homebrew "$HOME"');
+    } else {
+      log.info("Resolve the error, then rerun ./install");
+    }
+    Deno.exit(1);
+  }
+}

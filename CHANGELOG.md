@@ -51,6 +51,16 @@ and this project adheres to
 
 ### Fixed
 
+- The installer now adds Homebrew's bin directory to its active `PATH`, verifies
+  that required `just` and mise commands exist, and does not reinstall mise
+  after Homebrew installed it.
+- Package failures stop dependent phases, preserve full Homebrew output in
+  `local/install-homebrew.log`, and report a concise root cause without a raw
+  Deno stack trace.
+- Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
+  checks disk capacity and write access before large installs and warns when an
+  existing Deno version differs from the CI-supported release line. Dry runs no
+  longer claim that installation succeeded.
 - `.zprofile` activates mise shims, so login and GUI shells can resolve the
   tools mise owns. Without it, git reported "cannot run delta" everywhere
   outside an interactive zsh.
@@ -71,6 +81,8 @@ and this project adheres to
 
 ### Changed
 
+- GUI applications and fonts moved to the optional `Brewfile.apps` profile, so
+  the default bootstrap requires less disk space.
 - `.tool-versions` pins `npm:pnpm` instead of `pnpm`. mise's default `aqua`
   backend uses a stale asset template (`pnpm-macos-arm64`) and fails to install
   pnpm on Apple silicon.

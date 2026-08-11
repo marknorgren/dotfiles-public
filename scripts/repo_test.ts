@@ -294,6 +294,30 @@ Deno.test("the installer pins the same Deno line CI pins", async () => {
   );
 });
 
+Deno.test("the default Brewfile keeps just required and GUI apps optional", async () => {
+  const brewfile = await Deno.readTextFile(`${repoRoot}Brewfile`);
+  const appBrewfile = await Deno.readTextFile(`${repoRoot}Brewfile.apps`);
+
+  assert(
+    /^brew "just"/m.test(brewfile),
+    "Brewfile does not install just as a required command",
+  );
+
+  const defaultCasks = [...brewfile.matchAll(/^\s*cask "([^"]+)"/gm)]
+    .map((match) => match[1]);
+  assert(
+    defaultCasks.length === 1 && defaultCasks[0] === "1password-cli",
+    `default Brewfile contains optional GUI casks: ${defaultCasks.join(", ")}`,
+  );
+
+  for (const app of ["visual-studio-code", "firefox", "1password"]) {
+    assert(
+      appBrewfile.includes(`cask "${app}"`),
+      `Brewfile.apps does not contain ${app}`,
+    );
+  }
+});
+
 /** Run bin/verify with a controlled PATH and return its report. */
 async function runVerify(pathPrefix?: string): Promise<string> {
   const env: Record<string, string> = {

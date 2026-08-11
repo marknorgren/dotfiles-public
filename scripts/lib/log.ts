@@ -97,6 +97,73 @@ export async function capture(cmd: string[]): Promise<string> {
 }
 
 /**
+ * Run a command with bounded console output and preserve full diagnostics.
+ */
+export async function runLogged(
+  cmd: string[],
+  logPath: string,
+  options: { cwd?: string; env?: Record<string, string> } = {},
+): Promise<{ success: boolean; code: number }> {
+  const { cwd, env } = options;
+  const separator = Math.max(
+    logPath.lastIndexOf("/"),
+    logPath.lastIndexOf("\\"),
+  );
+  if (separator > 0) {
+    await Deno.mkdir(logPath.slice(0, separator), { recursive: true });
+  }
+
+  log.dim(`$ ${cmd.join(" ")}`);
+  log.info(`Detailed command output: ${logPath}`);
+
+  const command = new Deno.Command("/bin/sh", {
+    args: [
+      "-c",
+      'log_file=$1; shift; "$@" >"$log_file" 2>&1',
+      "run-logged",
+      logPath,
+      ...cmd,
+    ],
+    cwd,
+    env: env ? { ...Deno.env.toObject(), ...env } : undefined,
+    stdin: "inherit",
+    stdout: "null",
+    stderr: "null",
+  });
+
+  const { code } = await command.output();
+  if (code !== 0) {
+    const output = await Deno.readTextFile(logPath).catch(() => "");
+    const diagnostic = summarizeFailure(output);
+    const details = diagnostic ? `\n${diagnostic}` : "";
+    throw new Error(
+      `Command failed (exit ${code}): ${
+        cmd.join(" ")
+      }${details}\nFull log: ${logPath}`,
+    );
+  }
+
+  return { success: true, code };
+}
+
+function summarizeFailure(output: string): string {
+  const lines = output.split("\n").map((line) => line.trim()).filter(Boolean);
+  for (
+    const pattern of [
+      /no space left/i,
+      /disk full/i,
+      /input\/output error/i,
+      /permission denied/i,
+    ]
+  ) {
+    const match = lines.find((line) => pattern.test(line));
+    if (match) return match;
+  }
+
+  return lines.at(-1) ?? "";
+}
+
+/**
  * Check if a command exists
  */
 export async function commandExists(name: string): Promise<boolean> {

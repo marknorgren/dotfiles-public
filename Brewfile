@@ -81,19 +81,6 @@ brew "shellcheck"  # Shell script linter
 brew "cmake"  # Build system
 brew "mas"  # Mac App Store CLI, lets brew bundle cover App Store installs
 
-# Development Applications
-cask "visual-studio-code"
-cask "zed"
-cask "sublime-text"
-cask "warp"
-cask "ghostty"  # Terminal; config is symlinked to ~/.config/ghostty
-cask "xcodes-app"  # Install this first to manage Xcode
-cask "orbstack"  # Docker compatibility and Linux VMs
-cask "fork"
-cask "proxyman"
-cask "dbeaver-community"
-cask "dash"
-
 # Xcode-dependent tools
 # Note: Install these after installing Xcode from the App Store
 # brew "xcbeautify"  # Uncomment after Xcode installation
@@ -130,24 +117,6 @@ brew "ollama"  # Local LLM runner
 # Database Tools
 brew "sqlite"  # SQLite database
 
-# Fonts (no longer needs tap specification)
-cask "font-fira-code"  # Programming font
-cask "font-jetbrains-mono"  # Programming font
-
-# Productivity & Utilities
-# cask "rectangle"  # Window management
-# cask "raycast"  # Spotlight replacement
-cask "cleanshot"  # Screenshot tool
-cask "hiddenbar"  # Menu bar manager (Open source alternative to Bartender)
-cask "stats"  # System monitor (Open source alternative to iStat Menus)
-
-# Browsers
-cask "google-chrome"  # Web browser
-cask "microsoft-edge"  # Web browser
-cask "firefox"  # Web browser
-
-# Only install 1Password if not already present
-if !File.exist?("/Applications/1Password.app")
-  cask "1password"
-end
+# 1Password CLI is required for secret-backed setup. GUI apps and fonts live in
+# Brewfile.apps so the default bootstrap has a smaller disk footprint.
 cask "1password-cli"

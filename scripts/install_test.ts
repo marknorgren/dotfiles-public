@@ -1,8 +1,366 @@
+import { fromFileUrl } from "@std/path";
+
+const repoRoot = fromFileUrl(new URL("../", import.meta.url)).replace(
+  /\/$/,
+  "",
+);
+const denoInfo = new Deno.Command(Deno.execPath(), {
+  args: ["info", "--json"],
+  stdout: "piped",
+}).outputSync();
+const denoDir = (JSON.parse(new TextDecoder().decode(denoInfo.stdout)) as {
+  denoDir: string;
+}).denoDir;
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
+
+async function runRemoteBootstrap(denoVersion: string): Promise<string> {
+  const root = await Deno.makeTempDir();
+  const home = `${root}/home`;
+  const temp = `${root}/tmp`;
+  const bin = `${root}/bin`;
+  const homebrewBin = `${root}/homebrew/bin`;
+
+  await Deno.mkdir(home, { recursive: true });
+  await Deno.mkdir(temp, { recursive: true });
+  await Deno.mkdir(bin, { recursive: true });
+  await Deno.mkdir(homebrewBin, { recursive: true });
+  await writeExecutable(
+    `${bin}/deno`,
+    `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno ${denoVersion} (stable, release, test)\\n'
+  exit 0
+fi
+exec "${Deno.execPath()}" "$@"
+`,
+  );
+  await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+  const bootstrap = await Deno.readTextFile(`${repoRoot}/install`);
+  const command = new Deno.Command("/bin/bash", {
+    args: ["-c", bootstrap, "/bin/bash", "--dry-run"],
+    cwd: repoRoot,
+    env: {
+      DENO_DIR: denoDir,
+      DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+      DOTFILES_MIN_FREE_KB: "0",
+      HOME: home,
+      NO_COLOR: "1",
+      PATH: `${bin}:/usr/bin:/bin`,
+      TMPDIR: temp,
+    },
+    stdout: "piped",
+    stderr: "piped",
+  });
+
+  const { code, stdout, stderr } = await command.output();
+  const output = `${new TextDecoder().decode(stdout)}${
+    new TextDecoder().decode(stderr)
+  }`;
+  assert(code === 0, `remote dry run failed: ${output}`);
+  return output;
+}
+
+Deno.test({
+  name: "remote bootstrap reports the checkout directory",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const output = await runRemoteBootstrap("2.8.3");
+    const reportedDirectory = output.match(/Dotfiles directory: ([^\n]+)/)?.[1];
+    assert(
+      reportedDirectory?.endsWith("/dotfiles-public"),
+      `expected checkout directory, got: ${output}`,
+    );
+    assert(
+      !output.includes("Dotfiles directory: /bin\n"),
+      `shell binary directory leaked into installer output: ${output}`,
+    );
+    assert(
+      output.includes("Dry run completed; no changes were made"),
+      `dry run reported an installed system: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap warns when Deno differs from the supported release line",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const output = await runRemoteBootstrap("2.9.5");
+    assert(
+      output.includes("does not match the supported 2.8 release line"),
+      `expected a Deno compatibility warning, got: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name:
+    "bootstrap stops before package installation when storage is insufficient",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+
+    const command = new Deno.Command("/bin/bash", {
+      args: [`${repoRoot}/install`, "--dry-run"],
+      cwd: repoRoot,
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES_MIN_FREE_KB: "999999999999",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: "/usr/bin:/bin",
+        TMPDIR: temp,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code !== 0, `expected storage preflight to fail: ${output}`);
+    assert(
+      output.includes("Insufficient free space"),
+      `expected an actionable storage error, got: ${output}`,
+    );
+    assert(
+      !output.includes("Running installer"),
+      `installer continued after storage failure: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap stops when its temporary directory is not writable",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.chmod(temp, 0o555);
+
+    try {
+      const command = new Deno.Command("/bin/bash", {
+        args: [`${repoRoot}/install`],
+        cwd: repoRoot,
+        env: {
+          DENO_DIR: denoDir,
+          DOTFILES_MIN_FREE_KB: "0",
+          HOME: home,
+          NO_COLOR: "1",
+          PATH: "/usr/bin:/bin",
+          TMPDIR: temp,
+        },
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const { code, stdout, stderr } = await command.output();
+      const output = `${new TextDecoder().decode(stdout)}${
+        new TextDecoder().decode(stderr)
+      }`;
+
+      assert(code !== 0, `expected write preflight to fail: ${output}`);
+      assert(
+        output.includes(`Cannot write to ${temp}`),
+        `expected a write-access error, got: ${output}`,
+      );
+      assert(
+        !output.includes("Running installer"),
+        `installer continued after write failure: ${output}`,
+      );
+    } finally {
+      await Deno.chmod(temp, 0o755);
+    }
+  },
+});
+
+Deno.test({
+  name: "Homebrew bin is available before required commands are verified",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+
+    await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await Deno.writeTextFile(
+      `${dotfiles}/Brewfile`,
+      'brew "just"\nbrew "mise"\n',
+    );
+    await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
+    await writeExecutable(
+      `${bin}/which`,
+      `#!/bin/sh
+IFS=:
+for dir in $PATH; do
+  if [ -x "$dir/$1" ]; then
+    exit 0
+  fi
+done
+exit 1
+`,
+    );
+    await writeExecutable(
+      `${homebrewBin}/brew`,
+      `#!/bin/sh
+if [ "$1" = "bundle" ]; then
+  printf 'bundle-ran\\n'
+fi
+exit 0
+`,
+    );
+    await writeExecutable(`${homebrewBin}/just`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(
+      `${homebrewBin}/mise`,
+      `#!/bin/sh
+if [ "$1" = "install" ]; then
+  printf 'mise-install-ran\\n' > "$HOME/mise-install-ran"
+fi
+exit 0
+`,
+    );
+
+    const installer = new URL("./install.ts", import.meta.url);
+    const command = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-env",
+        installer.pathname,
+        "--skip-symlinks",
+      ],
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES: dotfiles,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_TEST_PLATFORM: "macos",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: bin,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code === 0, `installer failed: ${output}`);
+    assert(
+      await Deno.stat(`${home}/mise-install-ran`).then(() => true, () => false),
+      `Homebrew mise was not used: ${output}`,
+    );
+    assert(
+      !output.includes("Installing mise..."),
+      `installer tried to install mise twice: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Homebrew failure stops dependent phases with a concise diagnostic",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+
+    await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await Deno.writeTextFile(`${dotfiles}/Brewfile`, 'brew "just"\n');
+    await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
+    await writeExecutable(`${bin}/which`, "#!/bin/sh\nexit 1\n");
+    await writeExecutable(
+      `${homebrewBin}/brew`,
+      `#!/bin/sh
+if [ "$1" = "bundle" ]; then
+  printf 'Input/output error at /private/tmp/homebrew-unpack-test\\n' >&2
+  exit 23
+fi
+exit 0
+`,
+    );
+
+    const installer = new URL("./install.ts", import.meta.url);
+    const command = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-env",
+        installer.pathname,
+        "--skip-symlinks",
+      ],
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES: dotfiles,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_TEST_PLATFORM: "macos",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: bin,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code !== 0, `expected Homebrew failure: ${output}`);
+    assert(
+      output.includes(
+        "Input/output error at /private/tmp/homebrew-unpack-test",
+      ),
+      `expected the root cause in the summary, got: ${output}`,
+    );
+    assert(
+      output.includes("Full log:"),
+      `expected the detailed log path, got: ${output}`,
+    );
+    assert(
+      !output.includes("Setting up mise"),
+      `installer continued into mise after Homebrew failed: ${output}`,
+    );
+    assert(
+      !output.includes("at run ("),
+      `raw stack trace leaked into normal output: ${output}`,
+    );
+  },
+});
 
 async function writeExecutable(path: string, contents: string): Promise<void> {
   await Deno.writeTextFile(path, contents);
@@ -45,6 +403,7 @@ Deno.test({
         "--skip-symlinks",
       ],
       env: {
+        DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         DOTFILES_TEST_DISABLE_SYSTEM_BREW: "1",
         HOME: home,
@@ -113,6 +472,7 @@ Deno.test({
         "--force",
       ],
       env: {
+        DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         HOME: home,
         PATH: bin,
@@ -206,6 +566,7 @@ esac
         "--skip-symlinks",
       ],
       env: {
+        DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         HOME: home,
         PATH: bin,
@@ -288,6 +649,7 @@ esac
         "--skip-symlinks",
       ],
       env: {
+        DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         HOME: home,
         PATH: bin,
@@ -344,6 +706,7 @@ exit 0
     const command = new Deno.Command("/bin/bash", {
       args: [bootstrap.pathname, "--dry-run"],
       env: {
+        DENO_DIR: denoDir,
         HOME: home,
         PATH: `${bin}:/usr/bin:/bin`,
         NO_COLOR: "1",
@@ -423,6 +786,7 @@ exit 0
         "--skip-symlinks",
       ],
       env: {
+        DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         HOME: home,
         PATH: `${bin}:/usr/bin:/bin`,

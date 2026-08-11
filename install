@@ -11,9 +11,17 @@ TARGET_DIR="${DOTFILES_TARGET:-$HOME/.dotfiles-public}"
 # format code that the pinned CI gate then rejects. Keep this on the same line
 # as deno-version in .github/workflows/ci.yml; a test enforces that.
 DENO_VERSION="v2.8.3"
+MIN_FREE_KB="${DOTFILES_MIN_FREE_KB:-8388608}"
+DRY_RUN=0
+for arg in "$@"; do
+    if [[ "$arg" == "--dry-run" || "$arg" == "-n" ]]; then
+        DRY_RUN=1
+        break
+    fi
+done
 
-script_path="${BASH_SOURCE[0]:-$0}"
-if [[ "$script_path" == "-" || "$script_path" == "bash" ]]; then
+script_path="${BASH_SOURCE[0]:-}"
+if [[ -z "$script_path" || ! -f "$script_path" ]]; then
     DOTFILES_DIR="$PWD"
 else
     DOTFILES_DIR="$(cd "$(dirname "$script_path")" && pwd)"
@@ -23,12 +31,14 @@ fi
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
 log_info() { echo -e "${BLUE}ℹ${NC} $1"; }
 log_success() { echo -e "${GREEN}✓${NC} $1"; }
-log_error() { echo -e "${RED}✗${NC} $1"; }
+log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
+log_error() { echo -e "${RED}✗${NC} $1" >&2; }
 log_header() { echo -e "\n${BOLD}▸ $1${NC}"; }
 
 # Detect platform
@@ -42,8 +52,18 @@ detect_platform() {
 
 # Install Deno if not present
 install_deno() {
+    local installed_version
+    local supported_line
+
     if command -v deno &>/dev/null; then
+        installed_version="$(deno --version | head -1 | awk '{print $2}')"
+        supported_line="${DENO_VERSION#v}"
+        supported_line="${supported_line%.*}"
         log_info "Deno already installed: $(deno --version | head -1)"
+        if [[ "$installed_version" != "$supported_line".* ]]; then
+            log_warn "Deno $installed_version does not match the supported $supported_line release line"
+            log_info "Fresh installs use $DENO_VERSION to match CI formatting"
+        fi
         return 0
     fi
 
@@ -66,6 +86,70 @@ install_deno() {
     export PATH="$HOME/.deno/bin:$PATH"
 
     log_success "Deno installed: $(deno --version | head -1)"
+}
+
+homebrew_path() {
+    if [[ -n "${DOTFILES_HOMEBREW_PATH:-}" ]]; then
+        printf '%s\n' "$DOTFILES_HOMEBREW_PATH"
+    elif command -v brew &>/dev/null; then
+        command -v brew
+    elif [[ -x /opt/homebrew/bin/brew ]]; then
+        printf '%s\n' /opt/homebrew/bin/brew
+    elif [[ -x /usr/local/bin/brew ]]; then
+        printf '%s\n' /usr/local/bin/brew
+    fi
+}
+
+check_storage_path() {
+    local path="$1"
+    local available_kb
+    local probe
+
+    [[ -d "$path" ]] || return 0
+    available_kb="$(df -Pk "$path" 2>/dev/null | awk 'END {print $4}')"
+    if [[ ! "$available_kb" =~ ^[0-9]+$ ]]; then
+        log_error "Cannot determine free space for $path"
+        return 1
+    fi
+    if ((available_kb < MIN_FREE_KB)); then
+        log_error "Insufficient free space at $path: $((available_kb / 1024 / 1024)) GiB available; $((MIN_FREE_KB / 1024 / 1024)) GiB required"
+        log_info "Free space or expand the VM disk, then rerun the installer"
+        return 1
+    fi
+
+    if ((DRY_RUN == 0)); then
+        if ! probe="$(mktemp "$path/.dotfiles-install.XXXXXX")"; then
+            log_error "Cannot write to $path"
+            return 1
+        fi
+        rm -f "$probe"
+    fi
+}
+
+preflight_storage() {
+    local brew
+    local prefix
+    local temp_dir="${TMPDIR:-/private/tmp}"
+
+    if [[ ! "$MIN_FREE_KB" =~ ^[0-9]+$ ]]; then
+        log_error "DOTFILES_MIN_FREE_KB must be a non-negative integer"
+        return 1
+    fi
+
+    log_header "Checking storage"
+    check_storage_path "$HOME"
+    check_storage_path "$temp_dir"
+    if [[ "$(detect_platform)" == "macos" && "$temp_dir" != "/private/tmp" ]]; then
+        check_storage_path "/private/tmp"
+    fi
+
+    brew="$(homebrew_path)"
+    if [[ -n "$brew" ]]; then
+        prefix="$(cd "$(dirname "$brew")/.." && pwd)"
+        check_storage_path "$prefix"
+    fi
+
+    log_success "Storage preflight passed"
 }
 
 run_as_root() {
@@ -157,8 +241,14 @@ main() {
     echo "=================="
     echo
 
-    log_info "Dotfiles directory: $DOTFILES_DIR"
+    if [[ -f "$DOTFILES_DIR/scripts/install.ts" ]]; then
+        log_info "Dotfiles directory: $DOTFILES_DIR"
+    else
+        log_info "Bootstrap source: remote"
+    fi
     log_info "Platform: $(detect_platform)"
+
+    preflight_storage
 
     # macOS: ensure Xcode CLI tools
     install_xcode_cli
