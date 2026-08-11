@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Dotfiles bootstrap installer
 # This script installs Deno if needed, then runs the TypeScript installer
 set -euo pipefail
@@ -271,7 +271,7 @@ bootstrap_repo_if_needed() {
         git clone "$REPO_URL" "$TARGET_DIR"
     fi
 
-    exec /usr/bin/env bash "$TARGET_DIR/install" "$@"
+    exec /bin/bash "$TARGET_DIR/install" "$@"
 }
 
 # Main

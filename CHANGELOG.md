@@ -66,6 +66,8 @@ and this project adheres to
   standalone release, and keeps a working standalone copy ahead of Homebrew in
   shell `PATH`. A dry run stops with recovery guidance instead of installing
   Deno, and a real install verifies the exact pinned version before continuing.
+- The bootstrap uses macOS system Bash, so a damaged Homebrew Bash cannot stop
+  setup before recovery begins.
 - `.zprofile` activates mise shims, so login and GUI shells can resolve the
   tools mise owns. Without it, git reported "cannot run delta" everywhere
   outside an interactive zsh.

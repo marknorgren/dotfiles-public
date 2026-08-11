@@ -200,6 +200,127 @@ Deno.test({
 });
 
 Deno.test({
+  name: "bootstrap executable uses the system Bash",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await writeExecutable(
+      `${bin}/bash`,
+      "#!/bin/sh\nprintf 'broken Bash from PATH\\n' >&2\nexit 77\n",
+    );
+    await writeExecutable(
+      `${bin}/deno`,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno 2.8.3 (stable, release, test)\\n'
+  exit 0
+fi
+exec "${Deno.execPath()}" "$@"
+`,
+    );
+    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command(`${repoRoot}/install`, {
+      args: ["--dry-run"],
+      cwd: repoRoot,
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_MIN_FREE_KB: "0",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: `${bin}:/usr/bin:/bin`,
+        TMPDIR: temp,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+    assert(code === 0, `bootstrap used Bash from PATH: ${output}`);
+    assert(
+      output.includes("Dry run completed; no changes were made"),
+      `bootstrap did not complete through system Bash: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "remote bootstrap re-executes with the system Bash",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await writeExecutable(
+      `${bin}/bash`,
+      "#!/bin/sh\nprintf 'broken Bash from PATH\\n' >&2\nexit 77\n",
+    );
+    await writeExecutable(
+      `${bin}/deno`,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno 2.8.3 (stable, release, test)\\n'
+  exit 0
+fi
+exec "${Deno.execPath()}" "$@"
+`,
+    );
+    await writeExecutable(`${bin}/git`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+    const bootstrap = await Deno.readTextFile(`${repoRoot}/install`);
+    const command = new Deno.Command("/bin/bash", {
+      args: ["-c", bootstrap, "/bin/bash", "--dry-run"],
+      cwd: root,
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_MIN_FREE_KB: "0",
+        DOTFILES_TARGET: repoRoot,
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: `${bin}:/usr/bin:/bin`,
+        TMPDIR: temp,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+    assert(code === 0, `remote bootstrap used Bash from PATH: ${output}`);
+    assert(
+      output.includes("Dry run completed; no changes were made"),
+      `remote bootstrap did not complete through system Bash: ${output}`,
+    );
+  },
+});
+
+Deno.test({
   name: "bootstrap warns when Deno differs from the supported release line",
   ignore: Deno.build.os === "windows",
   async fn() {
