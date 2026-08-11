@@ -297,3 +297,46 @@ exit 1
     );
   },
 });
+
+Deno.test({
+  name: "shells prefer the standalone Deno installation",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    try {
+      await Deno.stat("/bin/zsh");
+    } catch {
+      return;
+    }
+
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const homebrewBin = `${root}/homebrew/bin`;
+    const standaloneBin = `${root}/.deno/bin`;
+    await Deno.mkdir(dotfiles, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await Deno.mkdir(standaloneBin, { recursive: true });
+    await Deno.copyFile(`${repoRoot}/.exports`, `${dotfiles}/.exports`);
+    await writeExecutable(`${homebrewBin}/deno`, "#!/bin/sh\nexit 1\n");
+    await writeExecutable(`${standaloneBin}/deno`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command("/bin/zsh", {
+      args: ["-f", "-c", 'source "$DOTFILES/.exports"; command -v deno'],
+      clearEnv: true,
+      env: {
+        DOTFILES: dotfiles,
+        HOME: root,
+        PATH: `${homebrewBin}:/usr/bin:/bin`,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const resolved = new TextDecoder().decode(stdout).trim();
+    assert(code === 0, new TextDecoder().decode(stderr));
+    assert(
+      resolved === `${standaloneBin}/deno`,
+      `shell resolved Deno to "${resolved}", expected the standalone install`,
+    );
+  },
+});

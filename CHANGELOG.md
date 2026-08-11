@@ -62,6 +62,8 @@ and this project adheres to
   existing Deno version differs from the CI-supported release line. Dry runs no
   longer claim that installation succeeded. Storage probe cleanup is isolated
   from the caller's `PATH` and locale.
+- The bootstrap detects an unusable Deno executable, installs its pinned
+  standalone release, and keeps that release ahead of Homebrew in shell `PATH`.
 - `.zprofile` activates mise shims, so login and GUI shells can resolve the
   tools mise owns. Without it, git reported "cannot run delta" everywhere
   outside an interactive zsh.

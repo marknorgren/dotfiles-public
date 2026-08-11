@@ -100,6 +100,83 @@ Deno.test({
 });
 
 Deno.test({
+  name: "bootstrap replaces an unusable Deno executable",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+    const workingDeno = `${root}/working-deno`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await writeExecutable(
+      `${bin}/deno`,
+      "#!/bin/sh\nprintf 'dyld: Library not loaded\\n' >&2\nexit 127\n",
+    );
+    await writeExecutable(
+      workingDeno,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno 2.8.3 (stable, release, test)\\n'
+fi
+exit 0
+`,
+    );
+    await writeExecutable(
+      `${bin}/curl`,
+      `#!/bin/sh
+mkdir -p "$HOME/.deno/bin"
+cp "$WORKING_DENO" "$HOME/.deno/bin/deno"
+printf 'exit 0\\n'
+`,
+    );
+    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command("/bin/bash", {
+      args: [`${repoRoot}/install`],
+      cwd: repoRoot,
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_MIN_FREE_KB: "0",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: `${bin}:/usr/bin:/bin`,
+        TMPDIR: temp,
+        WORKING_DENO: workingDeno,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code === 0, `expected bootstrap recovery to succeed: ${output}`);
+    assert(
+      output.includes("Existing Deno is unusable"),
+      `expected an actionable Deno warning, got: ${output}`,
+    );
+    assert(
+      output.includes("Deno installed: deno 2.8.3"),
+      `expected the pinned Deno installation, got: ${output}`,
+    );
+    assert(
+      !output.includes("dyld: Library not loaded"),
+      `raw loader failure leaked into normal output: ${output}`,
+    );
+  },
+});
+
+Deno.test({
   name:
     "bootstrap stops before package installation when storage is insufficient",
   ignore: Deno.build.os === "windows",

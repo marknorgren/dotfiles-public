@@ -50,26 +50,44 @@ detect_platform() {
     esac
 }
 
-# Install Deno if not present
-install_deno() {
-    local installed_version
-    local supported_line
+read_deno_version() {
+    local version_line
 
-    if command -v deno &>/dev/null; then
-        installed_version="$(deno --version | head -1 | awk '{print $2}')"
+    if ! version_line="$("$1" --version 2>/dev/null | head -1)" || [[ "$version_line" != deno\ * ]]; then
+        return 1
+    fi
+    printf '%s\n' "$version_line"
+}
+
+# Install Deno if not present or unusable
+install_deno() {
+    local deno_bin
+    local installed_version
+    local standalone_deno="$HOME/.deno/bin/deno"
+    local supported_line
+    local version_line
+
+    deno_bin="$(command -v deno || true)"
+    if [[ -n "$deno_bin" ]] && version_line="$(read_deno_version "$deno_bin")"; then
+        installed_version="${version_line#deno }"
+        installed_version="${installed_version%% *}"
         supported_line="${DENO_VERSION#v}"
         supported_line="${supported_line%.*}"
-        log_info "Deno already installed: $(deno --version | head -1)"
+        log_info "Deno already installed: $version_line"
         if [[ "$installed_version" != "$supported_line".* ]]; then
             log_warn "Deno $installed_version does not match the supported $supported_line release line"
             log_info "Fresh installs use $DENO_VERSION to match CI formatting"
         fi
         return 0
     fi
+    if [[ -n "$deno_bin" ]]; then
+        log_warn "Existing Deno is unusable: $deno_bin"
+        log_info "Installing the pinned standalone Deno release instead"
+    fi
 
-    if [[ -x "$HOME/.deno/bin/deno" ]]; then
+    if [[ -x "$standalone_deno" ]] && version_line="$(read_deno_version "$standalone_deno")"; then
         export PATH="$HOME/.deno/bin:$PATH"
-        log_info "Deno already installed: $(deno --version | head -1)"
+        log_info "Deno already installed: $version_line"
         return 0
     fi
 
@@ -85,7 +103,11 @@ install_deno() {
         CI=1 sh -s -- --no-modify-path "$DENO_VERSION"
     export PATH="$HOME/.deno/bin:$PATH"
 
-    log_success "Deno installed: $(deno --version | head -1)"
+    if ! version_line="$(read_deno_version "$standalone_deno")"; then
+        log_error "Deno installation did not produce a working executable at $standalone_deno"
+        return 1
+    fi
+    log_success "Deno installed: $version_line"
 }
 
 homebrew_path() {
