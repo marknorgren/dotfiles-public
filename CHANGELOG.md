@@ -58,8 +58,9 @@ and this project adheres to
   `local/install-homebrew.log`, and report a concise root cause without a raw
   Deno stack trace.
 - The installer repairs Homebrew's corrupt cache-link error by removing only the
-  named top-level entry inside `brew --cache`, then retries `brew bundle` once.
-  Other failures and paths outside the cache remain terminal.
+  named top-level entry inside `brew --cache`, then retries the failed package
+  or command-repair operation once. Other failures and paths outside the cache
+  remain terminal.
 - Remote bootstrap uses macOS system Git, even when Homebrew Git is broken. A
   remote one-liner run inside an existing checkout now updates that checkout.
   Package setup also reinstalls Homebrew Git or Bash with a missing dylib

@@ -54,3 +54,28 @@ Deno.test("runLogged preserves output and reports the first storage error", asyn
     "expected the complete command output in the log",
   );
 });
+
+Deno.test("runLogged reports an error before trailing progress output", async () => {
+  const root = await Deno.makeTempDir();
+  const logPath = `${root}/command.log`;
+  let thrown: unknown;
+
+  try {
+    await runLogged(
+      [
+        "/bin/sh",
+        "-c",
+        "printf 'Error: corrupt cache link\\nDownloaded gettext\\n' >&2; exit 1",
+      ],
+      logPath,
+    );
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert(thrown instanceof Error, "expected runLogged to reject");
+  assert(
+    thrown.message.includes("\nError: corrupt cache link\nFull log:"),
+    `expected the error rather than progress output, got: ${thrown.message}`,
+  );
+});

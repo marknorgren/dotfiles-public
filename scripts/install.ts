@@ -181,19 +181,12 @@ async function installHomebrew(
       "--file",
       brewfilePath,
     ];
-    try {
-      await runLogged(bundleCommand, logPath);
-    } catch (error) {
-      const repairedEntry = await removeCorruptHomebrewCacheEntry(
-        brewCommand,
-        logPath,
-      );
-      if (!repairedEntry) throw error;
-
-      log.warn(`Removed corrupt Homebrew cache entry: ${repairedEntry}`);
-      log.step("Retrying Brewfile packages once...");
-      await runLogged(bundleCommand, logPath);
-    }
+    await runHomebrewCommand(
+      brewCommand,
+      bundleCommand,
+      logPath,
+      "Retrying Brewfile packages once...",
+    );
 
     for (const command of ["just", "mise"]) {
       if (!(await commandExists(command))) {
@@ -261,9 +254,11 @@ async function repairHomebrewCommand(
   const logPath = `${paths.local}/install-homebrew-${command.formula}.log`;
 
   log.warn(`Repairing ${repairDescription}`);
-  await runLogged(
+  await runHomebrewCommand(
+    brewCommand,
     [brewCommand, "reinstall", ...formulas],
     logPath,
+    `Retrying Homebrew ${command.displayName} repair once...`,
   );
 
   const remainingFailure = await commandFailure(
@@ -274,6 +269,27 @@ async function repairHomebrewCommand(
     throw new Error(
       `Homebrew ${command.displayName} remains unusable after reinstall. Full log: ${logPath}`,
     );
+  }
+}
+
+async function runHomebrewCommand(
+  brewCommand: string,
+  command: string[],
+  logPath: string,
+  retryMessage: string,
+): Promise<void> {
+  try {
+    await runLogged(command, logPath);
+  } catch (error) {
+    const repairedEntry = await removeCorruptHomebrewCacheEntry(
+      brewCommand,
+      logPath,
+    );
+    if (!repairedEntry) throw error;
+
+    log.warn(`Removed corrupt Homebrew cache entry: ${repairedEntry}`);
+    log.step(retryMessage);
+    await runLogged(command, logPath);
   }
 }
 

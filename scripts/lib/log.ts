@@ -154,6 +154,7 @@ function summarizeFailure(output: string): string {
       /disk full/i,
       /input\/output error/i,
       /permission denied/i,
+      /^error:/i,
     ]
   ) {
     const match = lines.find((line) => pattern.test(line));

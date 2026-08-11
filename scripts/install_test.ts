@@ -853,6 +853,9 @@ Deno.test({
     const home = `${root}/home`;
     const bin = `${root}/bin`;
     const homebrewBin = `${root}/homebrew/bin`;
+    const brewCache = `${root}/cache`;
+    const cacheEntry = `${brewCache}/json-c--0.19`;
+    const gitReinstallCount = `${root}/git-reinstall-count`;
     const reinstallMarker = `${root}/brew-reinstall-args`;
     const workingBash = `${root}/working-bash`;
     const workingGit = `${root}/working-git`;
@@ -861,6 +864,7 @@ Deno.test({
     await Deno.mkdir(home, { recursive: true });
     await Deno.mkdir(bin, { recursive: true });
     await Deno.mkdir(homebrewBin, { recursive: true });
+    await Deno.mkdir(`${brewCache}/downloads`, { recursive: true });
     await Deno.writeTextFile(`${dotfiles}/Brewfile`, 'brew "just"\n');
     await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
     await writeExecutable(
@@ -900,9 +904,24 @@ exit 134
     await writeExecutable(
       `${homebrewBin}/brew`,
       `#!/bin/sh
+if [ "$1" = "--cache" ]; then
+  printf '%s\n' "$BREW_CACHE"
+  exit 0
+fi
 if [ "$1" = "reinstall" ]; then
   printf '%s\n' "$@" >> "$REINSTALL_MARKER"
   if [ "$2" = "gettext" ]; then
+    count=0
+    if [ -f "$GIT_REINSTALL_COUNT" ]; then
+      count=$(/bin/cat "$GIT_REINSTALL_COUNT")
+    fi
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$GIT_REINSTALL_COUNT"
+    if [ "$count" -eq 1 ]; then
+      /bin/ln -s 'downloads/cached-json-c.tar.gz' "$CACHE_ENTRY"
+      printf 'Error: Invalid argument @ rb_file_s_symlink - (downloads/cached-json-c.tar.gz, %s)\n' "$CACHE_ENTRY" >&2
+      exit 1
+    fi
     /bin/cp "$WORKING_GIT" "$BREW_GIT"
     /bin/chmod +x "$BREW_GIT"
   elif [ "$2" = "readline" ]; then
@@ -928,13 +947,16 @@ exit 0
         "--skip-symlinks",
       ],
       env: {
+        BREW_CACHE: brewCache,
         BREW_BASH: `${homebrewBin}/bash`,
         BREW_GIT: `${homebrewBin}/git`,
+        CACHE_ENTRY: cacheEntry,
         DENO_DIR: denoDir,
         DOTFILES: dotfiles,
         DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
         DOTFILES_TEST_PLATFORM: "macos",
         HOME: home,
+        GIT_REINSTALL_COUNT: gitReinstallCount,
         NO_COLOR: "1",
         PATH: bin,
         REINSTALL_MARKER: reinstallMarker,
@@ -956,8 +978,12 @@ exit 0
     );
     assert(
       (await Deno.readTextFile(reinstallMarker)) ===
-        "reinstall\ngettext\ngit\nreinstall\nreadline\nbash\n",
+        "reinstall\ngettext\ngit\nreinstall\ngettext\ngit\nreinstall\nreadline\nbash\n",
       `installer did not reinstall the missing dependencies: ${output}`,
+    );
+    assert(
+      output.includes(`Removed corrupt Homebrew cache entry: ${cacheEntry}`),
+      `installer did not repair the cache during command recovery: ${output}`,
     );
     assert(
       output.includes("Repairing Homebrew Git and missing dependency gettext"),
