@@ -686,6 +686,8 @@ Deno.test({
     const temp = `${root}/tmp`;
     const bin = `${root}/bin`;
     const homebrewBin = `${root}/homebrew/bin`;
+    const rmdirMarker = `${root}/rmdir-ran`;
+    const systemRmdir = `${root}/system-rmdir`;
 
     await Deno.mkdir(home, { recursive: true });
     await Deno.mkdir(temp, { recursive: true });
@@ -694,6 +696,13 @@ Deno.test({
     await writeExecutable(
       `${bin}/rm`,
       "#!/bin/sh\nprintf 'rm: Illegal byte sequence\\n' >&2\nexit 1\n",
+    );
+    await writeExecutable(
+      systemRmdir,
+      `#!/bin/sh
+: > "$RMDIR_MARKER"
+exec /bin/rmdir "$@"
+`,
     );
     await writeExecutable(
       `${bin}/deno`,
@@ -714,9 +723,11 @@ exit 0
         DENO_DIR: denoDir,
         DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
         DOTFILES_MIN_FREE_KB: "0",
+        DOTFILES_SYSTEM_RMDIR: systemRmdir,
         HOME: home,
         NO_COLOR: "1",
         PATH: `${bin}:/usr/bin:/bin`,
+        RMDIR_MARKER: rmdirMarker,
         TMPDIR: `${temp}/`,
       },
       stdout: "piped",
@@ -732,6 +743,10 @@ exit 0
     assert(
       !output.includes("Illegal byte sequence"),
       `installer used rm from PATH: ${output}`,
+    );
+    assert(
+      await exists(rmdirMarker),
+      `installer did not clean up the storage probe with rmdir: ${output}`,
     );
   },
 });
@@ -829,7 +844,8 @@ exit 0
 });
 
 Deno.test({
-  name: "installer repairs Homebrew Git when a dependency dylib is missing",
+  name:
+    "installer repairs Homebrew commands when dependency dylibs are missing",
   ignore: Deno.build.os === "windows",
   async fn() {
     const root = await Deno.makeTempDir();
@@ -838,6 +854,7 @@ Deno.test({
     const bin = `${root}/bin`;
     const homebrewBin = `${root}/homebrew/bin`;
     const reinstallMarker = `${root}/brew-reinstall-args`;
+    const workingBash = `${root}/working-bash`;
     const workingGit = `${root}/working-git`;
 
     await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
@@ -859,11 +876,22 @@ exit 1
 `,
     );
     await writeExecutable(
+      `${homebrewBin}/bash`,
+      `#!/bin/sh
+printf 'dyld: Library not loaded: /opt/homebrew/opt/readline/lib/libreadline.8.dylib\n' >&2
+exit 134
+`,
+    );
+    await writeExecutable(
       `${homebrewBin}/git`,
       `#!/bin/sh
 printf 'dyld: Library not loaded: /opt/homebrew/opt/gettext/lib/libintl.8.dylib\n' >&2
 exit 134
 `,
+    );
+    await writeExecutable(
+      workingBash,
+      "#!/bin/sh\nprintf 'GNU bash, version repaired-test\n'\n",
     );
     await writeExecutable(
       workingGit,
@@ -873,9 +901,14 @@ exit 134
       `${homebrewBin}/brew`,
       `#!/bin/sh
 if [ "$1" = "reinstall" ]; then
-  printf '%s\n' "$@" > "$REINSTALL_MARKER"
-  /bin/cp "$WORKING_GIT" "$BREW_GIT"
-  /bin/chmod +x "$BREW_GIT"
+  printf '%s\n' "$@" >> "$REINSTALL_MARKER"
+  if [ "$2" = "gettext" ]; then
+    /bin/cp "$WORKING_GIT" "$BREW_GIT"
+    /bin/chmod +x "$BREW_GIT"
+  elif [ "$2" = "readline" ]; then
+    /bin/cp "$WORKING_BASH" "$BREW_BASH"
+    /bin/chmod +x "$BREW_BASH"
+  fi
 fi
 exit 0
 `,
@@ -895,6 +928,7 @@ exit 0
         "--skip-symlinks",
       ],
       env: {
+        BREW_BASH: `${homebrewBin}/bash`,
         BREW_GIT: `${homebrewBin}/git`,
         DENO_DIR: denoDir,
         DOTFILES: dotfiles,
@@ -904,6 +938,7 @@ exit 0
         NO_COLOR: "1",
         PATH: bin,
         REINSTALL_MARKER: reinstallMarker,
+        WORKING_BASH: workingBash,
         WORKING_GIT: workingGit,
       },
       stdout: "piped",
@@ -915,15 +950,24 @@ exit 0
       new TextDecoder().decode(stderr)
     }`;
 
-    assert(code === 0, `installer failed to repair Homebrew Git: ${output}`);
+    assert(
+      code === 0,
+      `installer failed to repair Homebrew commands: ${output}`,
+    );
     assert(
       (await Deno.readTextFile(reinstallMarker)) ===
-        "reinstall\ngettext\ngit\n",
-      `installer did not reinstall Git's missing dependency: ${output}`,
+        "reinstall\ngettext\ngit\nreinstall\nreadline\nbash\n",
+      `installer did not reinstall the missing dependencies: ${output}`,
     );
     assert(
       output.includes("Repairing Homebrew Git and missing dependency gettext"),
       `installer did not report the Homebrew Git repair: ${output}`,
+    );
+    assert(
+      output.includes(
+        "Repairing Homebrew Bash and missing dependency readline",
+      ),
+      `installer did not report the Homebrew Bash repair: ${output}`,
     );
   },
 });

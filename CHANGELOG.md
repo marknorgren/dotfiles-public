@@ -62,7 +62,10 @@ and this project adheres to
   Other failures and paths outside the cache remain terminal.
 - Remote bootstrap uses macOS system Git, even when Homebrew Git is broken. A
   remote one-liner run inside an existing checkout now updates that checkout.
-  Package setup also reinstalls Homebrew Git with a missing dylib dependency.
+  Package setup also reinstalls Homebrew Git or Bash with a missing dylib
+  dependency.
+- Storage preflight uses a temporary directory and `rmdir`, avoiding the macOS
+  `rm: Illegal byte sequence` failure seen while cleaning up probe files.
 - Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
   checks disk capacity and write access before large installs and warns when an
   existing Deno version differs from the CI-supported release line. Dry runs no

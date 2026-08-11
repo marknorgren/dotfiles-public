@@ -159,7 +159,7 @@ async function installHomebrew(
 
   prependToPath(dirname(brewCommand));
 
-  await repairHomebrewGit(brewCommand, paths, options);
+  await repairHomebrewCommands(brewCommand, paths, options);
   await trustHomebrewTaps(brewCommand, options);
 
   // Install from Brewfile
@@ -205,7 +205,7 @@ async function installHomebrew(
   }
 }
 
-async function repairHomebrewGit(
+async function repairHomebrewCommands(
   brewCommand: string,
   paths: ReturnType<typeof getPaths>,
   options: InstallOptions,
@@ -217,37 +217,62 @@ async function repairHomebrewGit(
     : await findExecutable(brewCommand);
   if (!brewPath) return;
 
-  const brewGit = `${dirname(resolve(brewPath))}/git`;
+  const brewBin = dirname(resolve(brewPath));
+  for (
+    const command of [
+      { displayName: "Git", formula: "git", versionArgs: ["--version"] },
+      { displayName: "Bash", formula: "bash", versionArgs: ["--version"] },
+    ]
+  ) {
+    await repairHomebrewCommand(brewCommand, brewBin, paths, command);
+  }
+}
+
+async function repairHomebrewCommand(
+  brewCommand: string,
+  brewBin: string,
+  paths: ReturnType<typeof getPaths>,
+  command: {
+    displayName: string;
+    formula: string;
+    versionArgs: string[];
+  },
+): Promise<void> {
+  const commandPath = `${brewBin}/${command.formula}`;
   try {
-    const info = await Deno.stat(brewGit);
+    const info = await Deno.stat(commandPath);
     if (!info.isFile) return;
   } catch {
     return;
   }
 
-  const failure = await commandFailure(brewGit, ["--version"]);
+  const failure = await commandFailure(commandPath, command.versionArgs);
   if (failure === undefined) return;
 
   const dependency = failure.match(
     /\/(?:opt\/homebrew|usr\/local)\/opt\/([A-Za-z0-9@+_.-]+)\//,
   )?.[1];
-  const formulas = dependency && dependency !== "git"
-    ? [dependency, "git"]
-    : ["git"];
+  const formulas = dependency && dependency !== command.formula
+    ? [dependency, command.formula]
+    : [command.formula];
   const repairDescription = dependency
-    ? `Homebrew Git and missing dependency ${dependency}`
-    : "unusable Homebrew Git";
+    ? `Homebrew ${command.displayName} and missing dependency ${dependency}`
+    : `unusable Homebrew ${command.displayName}`;
+  const logPath = `${paths.local}/install-homebrew-${command.formula}.log`;
 
   log.warn(`Repairing ${repairDescription}`);
   await runLogged(
     [brewCommand, "reinstall", ...formulas],
-    `${paths.local}/install-homebrew-git.log`,
+    logPath,
   );
 
-  const remainingFailure = await commandFailure(brewGit, ["--version"]);
+  const remainingFailure = await commandFailure(
+    commandPath,
+    command.versionArgs,
+  );
   if (remainingFailure !== undefined) {
     throw new Error(
-      `Homebrew Git remains unusable after reinstall. Full log: ${paths.local}/install-homebrew-git.log`,
+      `Homebrew ${command.displayName} remains unusable after reinstall. Full log: ${logPath}`,
     );
   }
 }
