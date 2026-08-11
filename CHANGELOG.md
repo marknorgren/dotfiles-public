@@ -66,7 +66,9 @@ and this project adheres to
   Package setup also reinstalls Homebrew Git or Bash with a missing dylib
   dependency.
 - Storage preflight uses a temporary directory and `rmdir`, avoiding the macOS
-  `rm: Illegal byte sequence` failure seen while cleaning up probe files.
+  `rm: Illegal byte sequence` failure seen while cleaning up probe files. It
+  also accepts a probe directory that an external cleanup process already
+  removed.
 - Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
   checks disk capacity and write access before large installs and warns when an
   existing Deno version differs from the CI-supported release line. Dry runs no

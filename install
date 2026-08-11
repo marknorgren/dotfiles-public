@@ -202,9 +202,11 @@ check_storage_path() {
             log_error "Cannot write to $path"
             return 1
         fi
-        if ! LC_ALL=C "$rmdir_command" "$probe"; then
-            log_error "Cannot remove storage probe: $probe"
-            return 1
+        if ! LC_ALL=C "$rmdir_command" "$probe" 2>/dev/null; then
+            if [[ -e "$probe" ]]; then
+                log_error "Cannot remove storage probe: $probe"
+                return 1
+            fi
         fi
     fi
 }

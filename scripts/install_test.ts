@@ -701,7 +701,9 @@ Deno.test({
       systemRmdir,
       `#!/bin/sh
 : > "$RMDIR_MARKER"
-exec /bin/rmdir "$@"
+/bin/rmdir "$@"
+printf 'rmdir: %s: No such file or directory\n' "$1" >&2
+exit 1
 `,
     );
     await writeExecutable(
@@ -747,6 +749,10 @@ exit 0
     assert(
       await exists(rmdirMarker),
       `installer did not clean up the storage probe with rmdir: ${output}`,
+    );
+    assert(
+      !output.includes("No such file or directory"),
+      `installer reported an already-removed storage probe: ${output}`,
     );
   },
 });
