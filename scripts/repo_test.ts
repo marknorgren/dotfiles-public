@@ -234,6 +234,24 @@ Deno.test("pinned action SHAs have an update path", async () => {
   );
 });
 
+Deno.test("CI installs zsh before running verification tests", async () => {
+  // repo_test invokes bin/verify, whose env-based shebang requires zsh. The
+  // GitHub Ubuntu image does not provide it by default.
+  const workflow = await Deno.readTextFile(
+    `${repoRoot}.github/workflows/ci.yml`,
+  );
+  const install = workflow.indexOf(
+    "sudo apt-get install -y --no-install-recommends zsh",
+  );
+  const check = workflow.indexOf("run: just check");
+
+  assert(install !== -1, "ci.yml does not install zsh for bin/verify tests");
+  assert(
+    install < check,
+    "ci.yml installs zsh after just check, so bin/verify tests cannot start",
+  );
+});
+
 Deno.test("the installer pins the same Deno line CI pins", async () => {
   // `deno fmt` output changes between minor versions, so CI pins the toolchain.
   // A bootstrap that fetches whatever is current lets a fresh machine format

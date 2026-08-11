@@ -66,6 +66,8 @@ and this project adheres to
   between shfmt versions, and Homebrew always installs the current release.
 - The devcontainer installs the same pinned shfmt release as local setup and CI,
   so its `just check` post-create gate can run.
+- CI installs zsh before `just check`, so the repository tests can execute the
+  zsh-based `bin/verify` command on GitHub's Ubuntu runners.
 
 ### Changed
 
