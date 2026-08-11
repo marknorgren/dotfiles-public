@@ -83,7 +83,13 @@ path_add "/opt/homebrew/bin"
 path_add "/opt/homebrew/sbin"
 path_add "/usr/local/bin"
 path_add "/usr/local/sbin"
-path_add "$HOME/.deno/bin"
+
+if [[ -x "$HOME/.deno/bin/deno" ]] &&
+    _deno_version="$("$HOME/.deno/bin/deno" --version 2>/dev/null)" &&
+    [[ "$_deno_version" == deno\ * ]]; then
+    export PATH="$HOME/.deno/bin:$PATH"
+fi
+unset _deno_version
 
 if [[ -n "${PNPM_HOME:-}" ]]; then
     path_add "$PNPM_HOME"
