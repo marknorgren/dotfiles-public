@@ -1,7 +1,28 @@
-#!/bin/bash
+#!/bin/sh
+# shellcheck shell=bash
 # Dotfiles bootstrap installer
 # This script installs Deno if needed, then runs the TypeScript installer
+
+# Start with the system Bash so a broken Homebrew Bash on PATH cannot prevent
+# recovery. Hosts without /bin/bash fall back to the Bash available on PATH.
+if [ -z "${BASH_VERSION:-}" ] || [ "${BASH##*/}" = "sh" ]; then
+    bootstrap_bash="${DOTFILES_SYSTEM_BASH:-/bin/bash}"
+    if [ ! -x "$bootstrap_bash" ]; then
+        bootstrap_bash="$(command -v bash 2>/dev/null || true)"
+    fi
+    if [ -z "$bootstrap_bash" ] || [ ! -x "$bootstrap_bash" ]; then
+        printf 'Dotfiles installer requires Bash.\n' >&2
+        exit 1
+    fi
+    export DOTFILES_BOOTSTRAP_BASH="$bootstrap_bash"
+    exec "$bootstrap_bash" "$0" "$@"
+fi
+
 set -euo pipefail
+
+if [[ ! -x "${DOTFILES_BOOTSTRAP_BASH:-}" ]]; then
+    export DOTFILES_BOOTSTRAP_BASH="$BASH"
+fi
 
 REPO_URL="${DOTFILES_REPO:-https://github.com/marknorgren/dotfiles-public.git}"
 TARGET_DIR="${DOTFILES_TARGET:-$HOME/.dotfiles-public}"
@@ -271,7 +292,7 @@ bootstrap_repo_if_needed() {
         git clone "$REPO_URL" "$TARGET_DIR"
     fi
 
-    exec /bin/bash "$TARGET_DIR/install" "$@"
+    exec "$DOTFILES_BOOTSTRAP_BASH" "$TARGET_DIR/install" "$@"
 }
 
 # Main
