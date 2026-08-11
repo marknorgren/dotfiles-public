@@ -1,12 +1,66 @@
 # Shared public environment defaults.
 
-export EDITOR="${EDITOR:-vim}"
+if [[ -z "${EDITOR:-}" ]]; then
+    if command -v nvim >/dev/null 2>&1; then
+        export EDITOR="nvim"
+    else
+        export EDITOR="vim"
+    fi
+fi
 export VISUAL="${VISUAL:-$EDITOR}"
 export DOTFILES="${DOTFILES:-$HOME/.dotfiles-public}"
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
     export TERMINAL="${TERMINAL:-Warp.app}"
 fi
+
+# Locale
+if [[ -z "${LANG:-}" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        export LANG="en_US.UTF-8"
+    else
+        export LANG="C.UTF-8"
+    fi
+fi
+export LANG
+
+# History
+export HISTSIZE=65536
+export HISTFILESIZE="$HISTSIZE"
+export HISTCONTROL=ignoreboth
+
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    export HISTFILE="$HOME/.zsh_history"
+    export SAVEHIST="$HISTSIZE"
+    setopt EXTENDED_HISTORY
+    setopt HIST_EXPIRE_DUPS_FIRST
+    setopt HIST_IGNORE_DUPS
+    setopt HIST_IGNORE_SPACE
+    setopt HIST_VERIFY
+    setopt SHARE_HISTORY
+fi
+
+# Pager. Man pages go through bat when available for syntax highlighting.
+# `less -X` is deliberately not used: it breaks the alt-screen on modern
+# terminals, leaving man page output scrolled into the scrollback.
+if [[ -z "${MANPAGER:-}" ]]; then
+    if command -v bat >/dev/null 2>&1; then
+        _man_bat="bat"
+    elif command -v batcat >/dev/null 2>&1; then
+        _man_bat="batcat"
+    fi
+    if [[ -n "${_man_bat:-}" ]]; then
+        export MANPAGER="sh -c 'col -bx | $_man_bat -l man -p'"
+        export MANROFFOPT="${MANROFFOPT:--c}"
+    fi
+fi
+unset _man_bat
+export PAGER="${PAGER:-less}"
+export LESS="${LESS:--R}"
+
+# Colors
+export CLICOLOR=1
+export LSCOLORS="GxFxCxDxBxegedabagaced"
 
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1

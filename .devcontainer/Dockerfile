@@ -5,6 +5,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG DENO_VERSION=2.7.14
 # Keep this in sync with bin/devcontainer-stack.
 ARG JUST_VERSION=1.51.0
+ARG SHFMT_VERSION=3.13.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DENO_INSTALL=/usr/local
@@ -32,6 +33,16 @@ RUN case "$(uname -m)" in \
   && tar -xzf "just-${JUST_VERSION}-${just_target}.tar.gz" just \
   && install -m 0755 just /usr/local/bin/just \
   && rm -f just "just-${JUST_VERSION}-${just_target}.tar.gz"
+
+RUN case "$(uname -m)" in \
+      x86_64) shfmt_target="amd64"; shfmt_sha="fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1" ;; \
+      aarch64|arm64) shfmt_target="arm64"; shfmt_sha="32d92acaa5cd8abb29fc49dac123dc412442d5713967819d8af2c29f1b3857c7" ;; \
+      *) echo "unsupported architecture for shfmt: $(uname -m)" >&2; exit 1 ;; \
+    esac \
+  && curl -fsSLo /usr/local/bin/shfmt \
+    "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_${shfmt_target}" \
+  && echo "${shfmt_sha}  /usr/local/bin/shfmt" | sha256sum -c - \
+  && chmod 0755 /usr/local/bin/shfmt
 
 RUN curl -fsSL https://deno.land/install.sh | sh -s "v${DENO_VERSION}"
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b /usr/local/bin

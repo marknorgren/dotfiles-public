@@ -230,7 +230,7 @@ esac
 });
 
 Deno.test({
-  name: "installer can trust mise after installing it into ~/.local/bin",
+  name: "installer trusts mise and installs configured tools",
   ignore: Deno.build.os === "windows",
   async fn() {
     const root = await Deno.makeTempDir();
@@ -259,9 +259,14 @@ case "$1" in
     /bin/mkdir -p "$HOME/.local/bin"
     /bin/cat > "$HOME/.local/bin/mise" <<'EOF'
 #!/bin/sh
-if [ "$1" = "trust" ]; then
-  printf '%s\\n' "$2" > "$HOME/mise-trusted"
-fi
+case "$1" in
+  trust)
+    printf '%s\\n' "$2" > "$HOME/mise-trusted"
+    ;;
+  install)
+    pwd > "$HOME/mise-installed-from"
+    ;;
+esac
 exit 0
 EOF
     /bin/chmod +x "$HOME/.local/bin/mise"
@@ -302,6 +307,139 @@ esac
     assert(
       trustedPath.trim() === dotfiles,
       `expected mise to trust ${dotfiles}, got ${trustedPath}`,
+    );
+
+    const installedFrom = await Deno.readTextFile(
+      `${home}/mise-installed-from`,
+    );
+    const expectedInstallDirectory = await Deno.realPath(dotfiles);
+    assert(
+      installedFrom.trim() === expectedInstallDirectory,
+      `expected mise install to run from ${expectedInstallDirectory}, got ${installedFrom}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap works without a controlling terminal",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await writeExecutable(
+      `${bin}/deno`,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno test\n'
+fi
+exit 0
+`,
+    );
+
+    const bootstrap = new URL("../install", import.meta.url);
+    const command = new Deno.Command("/bin/bash", {
+      args: [bootstrap.pathname, "--dry-run"],
+      env: {
+        HOME: home,
+        PATH: `${bin}:/usr/bin:/bin`,
+        NO_COLOR: "1",
+      },
+      stdin: "null",
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stderr } = await command.output();
+    assert(
+      code === 0,
+      `bootstrap failed without a TTY: ${new TextDecoder().decode(stderr)}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Linux package errors are not reported as missing manifests",
+  ignore: Deno.build.os !== "linux",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+
+    let packageManager: "apt" | "dnf";
+    let manifest: "apt.txt" | "dnf.txt";
+    try {
+      await Deno.stat("/etc/debian_version");
+      packageManager = "apt";
+      manifest = "apt.txt";
+    } catch {
+      try {
+        await Deno.stat("/etc/redhat-release");
+        packageManager = "dnf";
+        manifest = "dnf.txt";
+      } catch {
+        return;
+      }
+    }
+
+    await Deno.mkdir(`${dotfiles}/packages`, { recursive: true });
+    await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.writeTextFile(
+      `${dotfiles}/packages/${manifest}`,
+      "broken-package\n",
+    );
+
+    await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
+    await writeExecutable(
+      `${bin}/which`,
+      '#!/bin/sh\nif [ "$1" = "mise" ] || [ "$1" = "starship" ]; then\n  exit 0\nfi\nexit 1\n',
+    );
+    await writeExecutable(`${bin}/mise`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(
+      `${bin}/sudo`,
+      `#!/bin/sh
+if [ "$1" = "${packageManager}" ] && [ "$2" = "install" ]; then
+  exit 42
+fi
+exit 0
+`,
+    );
+
+    const installer = new URL("./install.ts", import.meta.url);
+    const command = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-env",
+        installer.pathname,
+        "--skip-symlinks",
+      ],
+      env: {
+        DOTFILES: dotfiles,
+        HOME: home,
+        PATH: `${bin}:/usr/bin:/bin`,
+        NO_COLOR: "1",
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+    assert(code !== 0, `expected package failure, got: ${output}`);
+    assert(
+      !output.includes(`No ${manifest} found`),
+      `package failure was mislabeled as a missing manifest: ${output}`,
     );
   },
 });
