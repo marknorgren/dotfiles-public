@@ -192,6 +192,65 @@ Deno.test({
 });
 
 Deno.test({
+  name: "storage probe cleanup ignores a broken rm on PATH",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await writeExecutable(
+      `${bin}/rm`,
+      "#!/bin/sh\nprintf 'rm: Illegal byte sequence\\n' >&2\nexit 1\n",
+    );
+    await writeExecutable(
+      `${bin}/deno`,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno 2.8.3 (stable, release, test)\\n'
+fi
+exit 0
+`,
+    );
+    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command("/bin/bash", {
+      args: [`${repoRoot}/install`],
+      cwd: repoRoot,
+      env: {
+        DENO_DIR: denoDir,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_MIN_FREE_KB: "0",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: `${bin}:/usr/bin:/bin`,
+        TMPDIR: `${temp}/`,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code === 0, `expected storage cleanup to succeed: ${output}`);
+    assert(
+      !output.includes("Illegal byte sequence"),
+      `installer used rm from PATH: ${output}`,
+    );
+  },
+});
+
+Deno.test({
   name: "Homebrew bin is available before required commands are verified",
   ignore: Deno.build.os === "windows",
   async fn() {

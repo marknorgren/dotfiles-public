@@ -118,11 +118,14 @@ check_storage_path() {
     fi
 
     if ((DRY_RUN == 0)); then
-        if ! probe="$(mktemp "$path/.dotfiles-install.XXXXXX")"; then
+        if ! probe="$(mktemp "${path%/}/.dotfiles-install.XXXXXX")"; then
             log_error "Cannot write to $path"
             return 1
         fi
-        rm -f "$probe"
+        if ! LC_ALL=C /bin/rm -f "$probe"; then
+            log_error "Cannot remove storage probe: $probe"
+            return 1
+        fi
     fi
 }
 

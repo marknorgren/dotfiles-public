@@ -60,7 +60,8 @@ and this project adheres to
 - Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
   checks disk capacity and write access before large installs and warns when an
   existing Deno version differs from the CI-supported release line. Dry runs no
-  longer claim that installation succeeded.
+  longer claim that installation succeeded. Storage probe cleanup is isolated
+  from the caller's `PATH` and locale.
 - `.zprofile` activates mise shims, so login and GUI shells can resolve the
   tools mise owns. Without it, git reported "cannot run delta" everywhere
   outside an interactive zsh.
