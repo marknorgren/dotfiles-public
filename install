@@ -82,13 +82,21 @@ install_deno() {
     fi
     if [[ -n "$deno_bin" ]]; then
         log_warn "Existing Deno is unusable: $deno_bin"
-        log_info "Installing the pinned standalone Deno release instead"
     fi
 
     if [[ -x "$standalone_deno" ]] && version_line="$(read_deno_version "$standalone_deno")"; then
         export PATH="$HOME/.deno/bin:$PATH"
         log_info "Deno already installed: $version_line"
         return 0
+    fi
+
+    if ((DRY_RUN == 1)); then
+        log_error "Dry run requires a working Deno executable"
+        log_info "Rerun without --dry-run to install $DENO_VERSION, then retry the dry run"
+        return 1
+    fi
+    if [[ -n "$deno_bin" ]]; then
+        log_info "Installing the pinned standalone Deno release instead"
     fi
 
     log_header "Installing Deno"

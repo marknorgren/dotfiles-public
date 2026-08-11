@@ -18,6 +18,16 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
+async function exists(path: string): Promise<boolean> {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) return false;
+    throw error;
+  }
+}
+
 async function runRemoteBootstrap(denoVersion: string): Promise<string> {
   const root = await Deno.makeTempDir();
   const home = `${root}/home`;
@@ -172,6 +182,70 @@ printf 'exit 0\\n'
     assert(
       !output.includes("dyld: Library not loaded"),
       `raw loader failure leaked into normal output: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap dry run does not replace an unusable Deno executable",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const home = `${root}/home`;
+    const temp = `${root}/tmp`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+    const curlMarker = `${root}/curl-ran`;
+
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(temp, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await writeExecutable(`${bin}/deno`, "#!/bin/sh\nexit 127\n");
+    await writeExecutable(
+      `${bin}/curl`,
+      `#!/bin/sh
+: > "$CURL_MARKER"
+printf 'exit 0\\n'
+`,
+    );
+    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+    const command = new Deno.Command("/bin/bash", {
+      args: [`${repoRoot}/install`, "--dry-run"],
+      cwd: repoRoot,
+      env: {
+        CURL_MARKER: curlMarker,
+        DENO_DIR: denoDir,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_MIN_FREE_KB: "0",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: `${bin}:/usr/bin:/bin`,
+        TMPDIR: temp,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code !== 0, `expected dry run to stop without Deno: ${output}`);
+    assert(
+      output.includes("Dry run requires a working Deno executable"),
+      `expected actionable dry-run guidance, got: ${output}`,
+    );
+    assert(
+      !await exists(curlMarker),
+      `dry run invoked the Deno installer: ${output}`,
+    );
+    assert(
+      !output.includes("Running installer"),
+      `dry run continued without a working Deno: ${output}`,
     );
   },
 });
