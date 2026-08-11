@@ -781,6 +781,167 @@ exit 0
   },
 });
 
+async function runHomebrewCacheLinkFailure(
+  cacheEntryLocation: "inside" | "outside",
+): Promise<{
+  bundleRuns: number;
+  cacheEntry: string;
+  cacheEntryExists: boolean;
+  code: number;
+  output: string;
+}> {
+  const root = await Deno.makeTempDir();
+  const dotfiles = `${root}/dotfiles`;
+  const home = `${root}/home`;
+  const bin = `${root}/bin`;
+  const homebrewBin = `${root}/homebrew/bin`;
+  const brewCache = `${root}/cache`;
+  const bundleCount = `${root}/bundle-count`;
+  const cacheEntryRoot = cacheEntryLocation === "inside" ? brewCache : root;
+  const cacheEntry = `${cacheEntryRoot}/lazygit_bottle_manifest--0.64.0`;
+
+  await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
+  await Deno.mkdir(home, { recursive: true });
+  await Deno.mkdir(bin, { recursive: true });
+  await Deno.mkdir(homebrewBin, { recursive: true });
+  await Deno.mkdir(`${brewCache}/downloads`, { recursive: true });
+  await Deno.writeTextFile(`${dotfiles}/Brewfile`, 'brew "just"\n');
+  await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
+  await writeExecutable(
+    `${bin}/which`,
+    `#!/bin/sh
+IFS=:
+for dir in $PATH; do
+  if [ -x "$dir/$1" ]; then
+    exit 0
+  fi
+done
+exit 1
+`,
+  );
+  await writeExecutable(
+    `${homebrewBin}/brew`,
+    `#!/bin/sh
+if [ "$1" = "--cache" ]; then
+  printf '%s\\n' "$BREW_CACHE"
+  exit 0
+fi
+if [ "$1" = "bundle" ]; then
+  count=0
+  if [ -f "$BUNDLE_COUNT" ]; then
+    count=$(/bin/cat "$BUNDLE_COUNT")
+  fi
+  count=$((count + 1))
+  printf '%s\\n' "$count" > "$BUNDLE_COUNT"
+  if [ "$count" -eq 1 ]; then
+    /bin/ln -s 'downloads/cached-lazygit-manifest.json' "$CACHE_ENTRY"
+    printf 'Error: Invalid argument @ rb_file_s_symlink - (downloads/cached-lazygit-manifest.json, %s)\\n' "$CACHE_ENTRY" >&2
+    exit 1
+  fi
+  if [ -L "$CACHE_ENTRY" ]; then
+    printf 'corrupt cache entry was not removed\\n' >&2
+    exit 94
+  fi
+fi
+exit 0
+`,
+  );
+  await writeExecutable(`${homebrewBin}/just`, "#!/bin/sh\nexit 0\n");
+  await writeExecutable(`${homebrewBin}/mise`, "#!/bin/sh\nexit 0\n");
+
+  const installer = new URL("./install.ts", import.meta.url);
+  const command = new Deno.Command(Deno.execPath(), {
+    args: [
+      "run",
+      "--allow-read",
+      "--allow-write",
+      "--allow-run",
+      "--allow-env",
+      installer.pathname,
+      "--skip-symlinks",
+    ],
+    env: {
+      BREW_CACHE: brewCache,
+      BUNDLE_COUNT: bundleCount,
+      CACHE_ENTRY: cacheEntry,
+      DENO_DIR: denoDir,
+      DOTFILES: dotfiles,
+      DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+      DOTFILES_TEST_PLATFORM: "macos",
+      HOME: home,
+      NO_COLOR: "1",
+      PATH: bin,
+    },
+    stdout: "piped",
+    stderr: "piped",
+  });
+
+  const { code, stdout, stderr } = await command.output();
+  const output = `${new TextDecoder().decode(stdout)}${
+    new TextDecoder().decode(stderr)
+  }`;
+  const cacheEntryExists = await Deno.lstat(cacheEntry).then(
+    () => true,
+    (error) => {
+      if (error instanceof Deno.errors.NotFound) return false;
+      throw error;
+    },
+  );
+
+  return {
+    bundleRuns: Number((await Deno.readTextFile(bundleCount)).trim()),
+    cacheEntry,
+    cacheEntryExists,
+    code,
+    output,
+  };
+}
+
+Deno.test({
+  name: "Homebrew bundle repairs a corrupt cache link and retries once",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const result = await runHomebrewCacheLinkFailure("inside");
+
+    assert(
+      result.code === 0,
+      `expected Homebrew cache recovery: ${result.output}`,
+    );
+    assert(
+      result.bundleRuns === 2,
+      `expected one Homebrew retry: ${result.output}`,
+    );
+    assert(
+      result.output.includes(
+        `Removed corrupt Homebrew cache entry: ${result.cacheEntry}`,
+      ),
+      `expected cache repair to be reported: ${result.output}`,
+    );
+    assert(
+      !result.cacheEntryExists,
+      `expected corrupt cache entry to be removed: ${result.output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Homebrew cache repair does not remove paths outside brew --cache",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const result = await runHomebrewCacheLinkFailure("outside");
+
+    assert(result.code !== 0, `expected Homebrew failure: ${result.output}`);
+    assert(
+      result.bundleRuns === 1,
+      `installer retried an unsafe cache repair: ${result.output}`,
+    );
+    assert(
+      result.cacheEntryExists,
+      `installer removed a path outside brew --cache: ${result.output}`,
+    );
+  },
+});
+
 Deno.test({
   name: "Homebrew failure stops dependent phases with a concise diagnostic",
   ignore: Deno.build.os === "windows",

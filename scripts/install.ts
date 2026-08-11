@@ -8,7 +8,7 @@ import { detectPlatform, getPaths, type PlatformInfo } from "./lib/platform.ts";
 import { createAllSymlinks } from "./lib/symlink.ts";
 import { commandExists, log, run, runLogged } from "./lib/log.ts";
 import { parseArgs } from "@std/cli/parse-args";
-import { dirname } from "@std/path";
+import { dirname, resolve } from "@std/path";
 
 interface InstallOptions {
   dryRun: boolean;
@@ -173,10 +173,26 @@ async function installHomebrew(
   log.step("Installing packages from Brewfile...");
   if (!options.dryRun) {
     const logPath = `${paths.local}/install-homebrew.log`;
-    await runLogged(
-      [brewCommand, "bundle", "--quiet", "--file", brewfilePath],
-      logPath,
-    );
+    const bundleCommand = [
+      brewCommand,
+      "bundle",
+      "--quiet",
+      "--file",
+      brewfilePath,
+    ];
+    try {
+      await runLogged(bundleCommand, logPath);
+    } catch (error) {
+      const repairedEntry = await removeCorruptHomebrewCacheEntry(
+        brewCommand,
+        logPath,
+      );
+      if (!repairedEntry) throw error;
+
+      log.warn(`Removed corrupt Homebrew cache entry: ${repairedEntry}`);
+      log.step("Retrying Brewfile packages once...");
+      await runLogged(bundleCommand, logPath);
+    }
 
     for (const command of ["just", "mise"]) {
       if (!(await commandExists(command))) {
@@ -185,6 +201,42 @@ async function installHomebrew(
         );
       }
     }
+  }
+}
+
+async function removeCorruptHomebrewCacheEntry(
+  brewCommand: string,
+  logPath: string,
+): Promise<string | undefined> {
+  const output = await Deno.readTextFile(logPath).catch(() => "");
+  const match = output.match(
+    /Invalid argument @ rb_file_s_symlink - \([^,\r\n]+,\s*([^\r\n)]+)\)/,
+  );
+  if (!match) return undefined;
+
+  try {
+    const command = new Deno.Command(brewCommand, {
+      args: ["--cache"],
+      stdout: "piped",
+      stderr: "null",
+    });
+    const { code, stdout } = await command.output();
+    if (code !== 0) return undefined;
+
+    const cacheOutput = new TextDecoder().decode(stdout).trim();
+    if (!cacheOutput) return undefined;
+
+    const cacheRoot = resolve(cacheOutput);
+    const cacheEntry = resolve(match[1].trim());
+    if (dirname(cacheEntry) !== cacheRoot) return undefined;
+
+    const info = await Deno.lstat(cacheEntry);
+    if (!info.isFile && !info.isSymlink) return undefined;
+
+    await Deno.remove(cacheEntry);
+    return cacheEntry;
+  } catch {
+    return undefined;
   }
 }
 

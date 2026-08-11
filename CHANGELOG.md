@@ -57,6 +57,9 @@ and this project adheres to
 - Package failures stop dependent phases, preserve full Homebrew output in
   `local/install-homebrew.log`, and report a concise root cause without a raw
   Deno stack trace.
+- The installer repairs Homebrew's corrupt cache-link error by removing only the
+  named top-level entry inside `brew --cache`, then retries `brew bundle` once.
+  Other failures and paths outside the cache remain terminal.
 - Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
   checks disk capacity and write access before large installs and warns when an
   existing Deno version differs from the CI-supported release line. Dry runs no
