@@ -64,6 +64,8 @@ and this project adheres to
 - shfmt is pinned in `.tool-versions` instead of installed by Homebrew, so the
   version `just check` uses matches the one CI installs. Formatting can change
   between shfmt versions, and Homebrew always installs the current release.
+- The devcontainer installs the same pinned shfmt release as local setup and CI,
+  so its `just check` post-create gate can run.
 
 ### Changed
 

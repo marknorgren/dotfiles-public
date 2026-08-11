@@ -337,7 +337,7 @@ Deno.test({
   },
 });
 
-Deno.test("the shfmt CI pin matches the one mise installs", async () => {
+Deno.test("the shfmt pins match across local, CI, and devcontainer", async () => {
   // shfmt formatting can differ between versions, so a contributor running
   // `just check` locally must use the same build CI enforces with.
   const toolVersions = await Deno.readTextFile(`${repoRoot}.tool-versions`);
@@ -354,8 +354,23 @@ Deno.test("the shfmt CI pin matches the one mise installs", async () => {
   const ci = workflow.match(/SHFMT_VERSION:\s*v?(\S+)/);
   assert(ci !== null, "ci.yml does not pin SHFMT_VERSION");
 
+  const dockerfile = await Deno.readTextFile(
+    `${repoRoot}.devcontainer/Dockerfile`,
+  );
+  const devcontainer = dockerfile.match(/^ARG SHFMT_VERSION=v?(\S+)$/m);
+  assert(
+    devcontainer !== null,
+    ".devcontainer/Dockerfile does not pin SHFMT_VERSION",
+  );
+
   assert(
     local[1] === ci[1],
     `.tool-versions pins shfmt ${local[1]} but CI installs ${ci[1]}`,
+  );
+  assert(
+    local[1] === devcontainer[1],
+    `.tool-versions pins shfmt ${local[1]} but the devcontainer installs ${
+      devcontainer[1]
+    }`,
   );
 });
