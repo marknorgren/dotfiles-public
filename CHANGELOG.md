@@ -60,6 +60,9 @@ and this project adheres to
 - The installer repairs Homebrew's corrupt cache-link error by removing only the
   named top-level entry inside `brew --cache`, then retries `brew bundle` once.
   Other failures and paths outside the cache remain terminal.
+- Remote bootstrap uses macOS system Git, even when Homebrew Git is broken. A
+  remote one-liner run inside an existing checkout now updates that checkout.
+  Package setup also reinstalls Homebrew Git with a missing dylib dependency.
 - Remote bootstrap no longer reports `/bin` as the dotfiles directory. It also
   checks disk capacity and write access before large installs and warns when an
   existing Deno version differs from the CI-supported release line. Dry runs no

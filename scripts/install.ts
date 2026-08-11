@@ -159,6 +159,7 @@ async function installHomebrew(
 
   prependToPath(dirname(brewCommand));
 
+  await repairHomebrewGit(brewCommand, paths, options);
   await trustHomebrewTaps(brewCommand, options);
 
   // Install from Brewfile
@@ -201,6 +202,85 @@ async function installHomebrew(
         );
       }
     }
+  }
+}
+
+async function repairHomebrewGit(
+  brewCommand: string,
+  paths: ReturnType<typeof getPaths>,
+  options: InstallOptions,
+): Promise<void> {
+  if (options.dryRun) return;
+
+  const brewPath = brewCommand.includes("/")
+    ? brewCommand
+    : await findExecutable(brewCommand);
+  if (!brewPath) return;
+
+  const brewGit = `${dirname(resolve(brewPath))}/git`;
+  try {
+    const info = await Deno.stat(brewGit);
+    if (!info.isFile) return;
+  } catch {
+    return;
+  }
+
+  const failure = await commandFailure(brewGit, ["--version"]);
+  if (failure === undefined) return;
+
+  const dependency = failure.match(
+    /\/(?:opt\/homebrew|usr\/local)\/opt\/([A-Za-z0-9@+_.-]+)\//,
+  )?.[1];
+  const formulas = dependency && dependency !== "git"
+    ? [dependency, "git"]
+    : ["git"];
+  const repairDescription = dependency
+    ? `Homebrew Git and missing dependency ${dependency}`
+    : "unusable Homebrew Git";
+
+  log.warn(`Repairing ${repairDescription}`);
+  await runLogged(
+    [brewCommand, "reinstall", ...formulas],
+    `${paths.local}/install-homebrew-git.log`,
+  );
+
+  const remainingFailure = await commandFailure(brewGit, ["--version"]);
+  if (remainingFailure !== undefined) {
+    throw new Error(
+      `Homebrew Git remains unusable after reinstall. Full log: ${paths.local}/install-homebrew-git.log`,
+    );
+  }
+}
+
+async function findExecutable(name: string): Promise<string | undefined> {
+  for (const directory of (Deno.env.get("PATH") ?? "").split(":")) {
+    if (!directory) continue;
+    const path = `${directory}/${name}`;
+    try {
+      const info = await Deno.stat(path);
+      if (info.isFile) return path;
+    } catch {
+      // Keep looking.
+    }
+  }
+}
+
+async function commandFailure(
+  command: string,
+  args: string[],
+): Promise<string | undefined> {
+  try {
+    const result = await new Deno.Command(command, {
+      args,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    if (result.code === 0) return undefined;
+
+    const decoder = new TextDecoder();
+    return `${decoder.decode(result.stdout)}${decoder.decode(result.stderr)}`;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
 }
 

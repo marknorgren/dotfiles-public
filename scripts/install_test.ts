@@ -28,12 +28,23 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-async function runRemoteBootstrap(denoVersion: string): Promise<string> {
+interface RemoteBootstrapResult {
+  output: string;
+  pathGitRan: boolean;
+  systemGitArgs?: string;
+}
+
+async function runRemoteBootstrap(
+  denoVersion: string,
+): Promise<RemoteBootstrapResult> {
   const root = await Deno.makeTempDir();
   const home = `${root}/home`;
   const temp = `${root}/tmp`;
   const bin = `${root}/bin`;
   const homebrewBin = `${root}/homebrew/bin`;
+  const pathGitMarker = `${root}/path-git-ran`;
+  const systemGit = `${root}/system-git`;
+  const systemGitMarker = `${root}/system-git-args`;
 
   await Deno.mkdir(home, { recursive: true });
   await Deno.mkdir(temp, { recursive: true });
@@ -49,6 +60,22 @@ fi
 exec "${Deno.execPath()}" "$@"
 `,
   );
+  await writeExecutable(
+    `${bin}/git`,
+    `#!/bin/sh
+: > "$PATH_GIT_MARKER"
+printf 'dyld: Library not loaded: /opt/homebrew/opt/gettext/lib/libintl.8.dylib\n' >&2
+exit 134
+`,
+  );
+  await writeExecutable(
+    systemGit,
+    `#!/bin/sh
+printf '%s\n' "$@" > "$SYSTEM_GIT_MARKER"
+exit 0
+`,
+  );
+  await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
   await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
 
   const bootstrap = await Deno.readTextFile(`${repoRoot}/install`);
@@ -59,9 +86,13 @@ exec "${Deno.execPath()}" "$@"
       DENO_DIR: denoDir,
       DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
       DOTFILES_MIN_FREE_KB: "0",
+      DOTFILES_SYSTEM_GIT: systemGit,
+      DOTFILES_TARGET: repoRoot,
       HOME: home,
       NO_COLOR: "1",
       PATH: `${bin}:/usr/bin:/bin`,
+      PATH_GIT_MARKER: pathGitMarker,
+      SYSTEM_GIT_MARKER: systemGitMarker,
       TMPDIR: temp,
     },
     stdout: "piped",
@@ -73,7 +104,13 @@ exec "${Deno.execPath()}" "$@"
     new TextDecoder().decode(stderr)
   }`;
   assert(code === 0, `remote dry run failed: ${output}`);
-  return output;
+  return {
+    output,
+    pathGitRan: await exists(pathGitMarker),
+    systemGitArgs: await exists(systemGitMarker)
+      ? await Deno.readTextFile(systemGitMarker)
+      : undefined,
+  };
 }
 
 interface DenoRecoveryResult {
@@ -182,7 +219,8 @@ Deno.test({
   name: "remote bootstrap reports the checkout directory",
   ignore: Deno.build.os === "windows",
   async fn() {
-    const output = await runRemoteBootstrap("2.8.3");
+    const result = await runRemoteBootstrap("2.8.3");
+    const { output } = result;
     const reportedDirectory = output.match(/Dotfiles directory: ([^\n]+)/)?.[1];
     assert(
       reportedDirectory?.endsWith("/dotfiles-public"),
@@ -195,6 +233,14 @@ Deno.test({
     assert(
       output.includes("Dry run completed; no changes were made"),
       `dry run reported an installed system: ${output}`,
+    );
+    assert(
+      result.systemGitArgs === `-C\n${repoRoot}\npull\n--ff-only\n`,
+      `remote bootstrap did not update with system Git: ${output}`,
+    );
+    assert(
+      !result.pathGitRan,
+      `remote bootstrap invoked the broken Git from PATH: ${output}`,
     );
   },
 });
@@ -367,6 +413,7 @@ exec "${Deno.execPath()}" "$@"
         DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
         DOTFILES_MIN_FREE_KB: "0",
         DOTFILES_SYSTEM_BASH: `${bin}/bash`,
+        DOTFILES_SYSTEM_GIT: `${bin}/git`,
         DOTFILES_TARGET: repoRoot,
         HOME: home,
         NO_COLOR: "1",
@@ -401,7 +448,7 @@ Deno.test({
   name: "bootstrap warns when Deno differs from the supported release line",
   ignore: Deno.build.os === "windows",
   async fn() {
-    const output = await runRemoteBootstrap("2.9.5");
+    const { output } = await runRemoteBootstrap("2.9.5");
     assert(
       output.includes("does not match the supported 2.8 release line"),
       `expected a Deno compatibility warning, got: ${output}`,
@@ -777,6 +824,106 @@ exit 0
     assert(
       !output.includes("Installing mise..."),
       `installer tried to install mise twice: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "installer repairs Homebrew Git when a dependency dylib is missing",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const dotfiles = `${root}/dotfiles`;
+    const home = `${root}/home`;
+    const bin = `${root}/bin`;
+    const homebrewBin = `${root}/homebrew/bin`;
+    const reinstallMarker = `${root}/brew-reinstall-args`;
+    const workingGit = `${root}/working-git`;
+
+    await Deno.mkdir(`${dotfiles}/local`, { recursive: true });
+    await Deno.mkdir(home, { recursive: true });
+    await Deno.mkdir(bin, { recursive: true });
+    await Deno.mkdir(homebrewBin, { recursive: true });
+    await Deno.writeTextFile(`${dotfiles}/Brewfile`, 'brew "just"\n');
+    await writeExecutable(`${bin}/hostname`, "#!/bin/sh\nprintf test-host\n");
+    await writeExecutable(
+      `${bin}/which`,
+      `#!/bin/sh
+IFS=:
+for dir in $PATH; do
+  if [ -x "$dir/$1" ]; then
+    exit 0
+  fi
+done
+exit 1
+`,
+    );
+    await writeExecutable(
+      `${homebrewBin}/git`,
+      `#!/bin/sh
+printf 'dyld: Library not loaded: /opt/homebrew/opt/gettext/lib/libintl.8.dylib\n' >&2
+exit 134
+`,
+    );
+    await writeExecutable(
+      workingGit,
+      "#!/bin/sh\nprintf 'git version repaired-test\n'\n",
+    );
+    await writeExecutable(
+      `${homebrewBin}/brew`,
+      `#!/bin/sh
+if [ "$1" = "reinstall" ]; then
+  printf '%s\n' "$@" > "$REINSTALL_MARKER"
+  /bin/cp "$WORKING_GIT" "$BREW_GIT"
+  /bin/chmod +x "$BREW_GIT"
+fi
+exit 0
+`,
+    );
+    await writeExecutable(`${homebrewBin}/just`, "#!/bin/sh\nexit 0\n");
+    await writeExecutable(`${homebrewBin}/mise`, "#!/bin/sh\nexit 0\n");
+
+    const installer = new URL("./install.ts", import.meta.url);
+    const command = new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-env",
+        installer.pathname,
+        "--skip-symlinks",
+      ],
+      env: {
+        BREW_GIT: `${homebrewBin}/git`,
+        DENO_DIR: denoDir,
+        DOTFILES: dotfiles,
+        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+        DOTFILES_TEST_PLATFORM: "macos",
+        HOME: home,
+        NO_COLOR: "1",
+        PATH: bin,
+        REINSTALL_MARKER: reinstallMarker,
+        WORKING_GIT: workingGit,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    const output = `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`;
+
+    assert(code === 0, `installer failed to repair Homebrew Git: ${output}`);
+    assert(
+      (await Deno.readTextFile(reinstallMarker)) ===
+        "reinstall\ngettext\ngit\n",
+      `installer did not reinstall Git's missing dependency: ${output}`,
+    );
+    assert(
+      output.includes("Repairing Homebrew Git and missing dependency gettext"),
+      `installer did not report the Homebrew Git repair: ${output}`,
     );
   },
 });
@@ -1366,6 +1513,7 @@ exit 0
       args: [bootstrap.pathname, "--dry-run"],
       env: {
         DENO_DIR: denoDir,
+        DOTFILES_MIN_FREE_KB: "0",
         HOME: home,
         PATH: `${bin}:/usr/bin:/bin`,
         NO_COLOR: "1",
