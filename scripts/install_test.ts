@@ -76,6 +76,108 @@ exec "${Deno.execPath()}" "$@"
   return output;
 }
 
+interface DenoRecoveryResult {
+  code: number;
+  curlRan: boolean;
+  denoRunArgs?: string;
+  output: string;
+}
+
+async function runDenoRecovery(
+  installedVersion: string | undefined,
+): Promise<DenoRecoveryResult> {
+  const root = await Deno.makeTempDir();
+  const home = `${root}/home`;
+  const temp = `${root}/tmp`;
+  const bin = `${root}/bin`;
+  const homebrewBin = `${root}/homebrew/bin`;
+  const curlMarker = `${root}/curl-ran`;
+  const denoRunMarker = `${root}/deno-run-args`;
+  const installer = `${root}/deno-installer.sh`;
+  const workingDeno = installedVersion ? `${root}/working-deno` : "";
+
+  await Deno.mkdir(home, { recursive: true });
+  await Deno.mkdir(temp, { recursive: true });
+  await Deno.mkdir(bin, { recursive: true });
+  await Deno.mkdir(homebrewBin, { recursive: true });
+  await writeExecutable(
+    `${bin}/deno`,
+    "#!/bin/sh\nprintf 'dyld: Library not loaded\\n' >&2\nexit 127\n",
+  );
+  if (installedVersion) {
+    await writeExecutable(
+      workingDeno,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'deno ${installedVersion} (stable, release, test)\\n'
+  exit 0
+fi
+if [ "$1" = "run" ]; then
+  printf '%s\\n' "$@" > "$DENO_RUN_MARKER"
+  exit 0
+fi
+exit 1
+`,
+    );
+  }
+  await Deno.writeTextFile(
+    installer,
+    `#!/bin/sh
+if [ "$1" != "--no-modify-path" ] || [ "$2" != "v2.8.3" ]; then
+  exit 91
+fi
+if [ -n "$WORKING_DENO" ]; then
+  mkdir -p "$HOME/.deno/bin"
+  cp "$WORKING_DENO" "$HOME/.deno/bin/deno"
+fi
+`,
+  );
+  await writeExecutable(
+    `${bin}/curl`,
+    `#!/bin/sh
+if [ "$1" != "-fsSL" ] || [ "$2" != "https://deno.land/install.sh" ]; then
+  exit 92
+fi
+: > "$CURL_MARKER"
+/bin/cat "$DENO_INSTALLER"
+`,
+  );
+  await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
+  await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
+
+  const command = new Deno.Command("/bin/bash", {
+    args: [`${repoRoot}/install`],
+    cwd: repoRoot,
+    env: {
+      CURL_MARKER: curlMarker,
+      DENO_DIR: denoDir,
+      DENO_INSTALLER: installer,
+      DENO_RUN_MARKER: denoRunMarker,
+      DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
+      DOTFILES_MIN_FREE_KB: "0",
+      HOME: home,
+      NO_COLOR: "1",
+      PATH: `${bin}:/usr/bin:/bin`,
+      TMPDIR: temp,
+      WORKING_DENO: workingDeno,
+    },
+    stdout: "piped",
+    stderr: "piped",
+  });
+
+  const { code, stdout, stderr } = await command.output();
+  return {
+    code,
+    curlRan: await exists(curlMarker),
+    denoRunArgs: await exists(denoRunMarker)
+      ? await Deno.readTextFile(denoRunMarker)
+      : undefined,
+    output: `${new TextDecoder().decode(stdout)}${
+      new TextDecoder().decode(stderr)
+    }`,
+  };
+}
+
 Deno.test({
   name: "remote bootstrap reports the checkout directory",
   ignore: Deno.build.os === "windows",
@@ -113,64 +215,14 @@ Deno.test({
   name: "bootstrap replaces an unusable Deno executable",
   ignore: Deno.build.os === "windows",
   async fn() {
-    const root = await Deno.makeTempDir();
-    const home = `${root}/home`;
-    const temp = `${root}/tmp`;
-    const bin = `${root}/bin`;
-    const homebrewBin = `${root}/homebrew/bin`;
-    const workingDeno = `${root}/working-deno`;
-
-    await Deno.mkdir(home, { recursive: true });
-    await Deno.mkdir(temp, { recursive: true });
-    await Deno.mkdir(bin, { recursive: true });
-    await Deno.mkdir(homebrewBin, { recursive: true });
-    await writeExecutable(
-      `${bin}/deno`,
-      "#!/bin/sh\nprintf 'dyld: Library not loaded\\n' >&2\nexit 127\n",
+    const { code, curlRan, denoRunArgs, output } = await runDenoRecovery(
+      "2.8.3",
     );
-    await writeExecutable(
-      workingDeno,
-      `#!/bin/sh
-if [ "$1" = "--version" ]; then
-  printf 'deno 2.8.3 (stable, release, test)\\n'
-fi
-exit 0
-`,
-    );
-    await writeExecutable(
-      `${bin}/curl`,
-      `#!/bin/sh
-mkdir -p "$HOME/.deno/bin"
-cp "$WORKING_DENO" "$HOME/.deno/bin/deno"
-printf 'exit 0\\n'
-`,
-    );
-    await writeExecutable(`${bin}/xcode-select`, "#!/bin/sh\nexit 0\n");
-    await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
-
-    const command = new Deno.Command("/bin/bash", {
-      args: [`${repoRoot}/install`],
-      cwd: repoRoot,
-      env: {
-        DENO_DIR: denoDir,
-        DOTFILES_HOMEBREW_PATH: `${homebrewBin}/brew`,
-        DOTFILES_MIN_FREE_KB: "0",
-        HOME: home,
-        NO_COLOR: "1",
-        PATH: `${bin}:/usr/bin:/bin`,
-        TMPDIR: temp,
-        WORKING_DENO: workingDeno,
-      },
-      stdout: "piped",
-      stderr: "piped",
-    });
-
-    const { code, stdout, stderr } = await command.output();
-    const output = `${new TextDecoder().decode(stdout)}${
-      new TextDecoder().decode(stderr)
-    }`;
-
     assert(code === 0, `expected bootstrap recovery to succeed: ${output}`);
+    assert(
+      curlRan,
+      `bootstrap never invoked the pinned Deno installer: ${output}`,
+    );
     assert(
       output.includes("Existing Deno is unusable"),
       `expected an actionable Deno warning, got: ${output}`,
@@ -182,6 +234,44 @@ printf 'exit 0\\n'
     assert(
       !output.includes("dyld: Library not loaded"),
       `raw loader failure leaked into normal output: ${output}`,
+    );
+    assert(
+      denoRunArgs?.includes("scripts/install.ts"),
+      `bootstrap never ran the TypeScript installer: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap rejects a standalone Deno with the wrong pinned version",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const { code, denoRunArgs, output } = await runDenoRecovery("2.9.5");
+    assert(code !== 0, `expected a Deno version failure: ${output}`);
+    assert(
+      output.includes("Installed Deno 2.9.5 does not match pinned 2.8.3"),
+      `expected an exact-version error, got: ${output}`,
+    );
+    assert(
+      denoRunArgs === undefined,
+      `bootstrap continued after a Deno version mismatch: ${output}`,
+    );
+  },
+});
+
+Deno.test({
+  name: "bootstrap stops when Deno installation produces no executable",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const { code, denoRunArgs, output } = await runDenoRecovery(undefined);
+    assert(code !== 0, `expected a missing Deno failure: ${output}`);
+    assert(
+      output.includes("did not produce a working executable"),
+      `expected an actionable missing-Deno error, got: ${output}`,
+    );
+    assert(
+      denoRunArgs === undefined,
+      `bootstrap continued without an installed Deno: ${output}`,
     );
   },
 });

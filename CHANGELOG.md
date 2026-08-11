@@ -65,7 +65,7 @@ and this project adheres to
 - The bootstrap detects an unusable Deno executable, installs its pinned
   standalone release, and keeps a working standalone copy ahead of Homebrew in
   shell `PATH`. A dry run stops with recovery guidance instead of installing
-  Deno.
+  Deno, and a real install verifies the exact pinned version before continuing.
 - `.zprofile` activates mise shims, so login and GUI shells can resolve the
   tools mise owns. Without it, git reported "cannot run delta" everywhere
   outside an interactive zsh.

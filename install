@@ -62,6 +62,7 @@ read_deno_version() {
 # Install Deno if not present or unusable
 install_deno() {
     local deno_bin
+    local expected_version="${DENO_VERSION#v}"
     local installed_version
     local standalone_deno="$HOME/.deno/bin/deno"
     local supported_line
@@ -71,8 +72,7 @@ install_deno() {
     if [[ -n "$deno_bin" ]] && version_line="$(read_deno_version "$deno_bin")"; then
         installed_version="${version_line#deno }"
         installed_version="${installed_version%% *}"
-        supported_line="${DENO_VERSION#v}"
-        supported_line="${supported_line%.*}"
+        supported_line="${expected_version%.*}"
         log_info "Deno already installed: $version_line"
         if [[ "$installed_version" != "$supported_line".* ]]; then
             log_warn "Deno $installed_version does not match the supported $supported_line release line"
@@ -113,6 +113,12 @@ install_deno() {
 
     if ! version_line="$(read_deno_version "$standalone_deno")"; then
         log_error "Deno installation did not produce a working executable at $standalone_deno"
+        return 1
+    fi
+    installed_version="${version_line#deno }"
+    installed_version="${installed_version%% *}"
+    if [[ "$installed_version" != "$expected_version" ]]; then
+        log_error "Installed Deno $installed_version does not match pinned $expected_version"
         return 1
     fi
     log_success "Deno installed: $version_line"
