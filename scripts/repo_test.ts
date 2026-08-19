@@ -294,7 +294,7 @@ Deno.test("the installer pins the same Deno line CI pins", async () => {
   );
 });
 
-Deno.test("the default Brewfile keeps just required and GUI apps optional", async () => {
+Deno.test("the default Brewfile installs Warp while other GUI apps stay optional", async () => {
   const brewfile = await Deno.readTextFile(`${repoRoot}Brewfile`);
   const appBrewfile = await Deno.readTextFile(`${repoRoot}Brewfile.apps`);
 
@@ -305,9 +305,17 @@ Deno.test("the default Brewfile keeps just required and GUI apps optional", asyn
 
   const defaultCasks = [...brewfile.matchAll(/^\s*cask "([^"]+)"/gm)]
     .map((match) => match[1]);
+  const requiredCasks = ["warp", "1password-cli"];
   assert(
-    defaultCasks.length === 1 && defaultCasks[0] === "1password-cli",
-    `default Brewfile contains optional GUI casks: ${defaultCasks.join(", ")}`,
+    defaultCasks.length === requiredCasks.length &&
+      requiredCasks.every((cask) => defaultCasks.includes(cask)),
+    `default Brewfile casks differ from required casks: ${
+      defaultCasks.join(", ")
+    }`,
+  );
+  assert(
+    !appBrewfile.includes('cask "warp"'),
+    "Brewfile.apps duplicates required Warp cask",
   );
 
   for (const app of ["visual-studio-code", "firefox", "1password"]) {

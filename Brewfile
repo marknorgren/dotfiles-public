@@ -56,6 +56,7 @@ brew "direnv"  # Directory-specific envs
 brew "dash"  # POSIX shell
 brew "zsh-autosuggestions"  # Suggest completions from history
 brew "zsh-syntax-highlighting"  # Highlight the command line as you type
+cask "warp"  # Default terminal used by the linked editor and shell settings
 
 # Modern CLI Tools
 brew "bat"  # Better cat
@@ -117,6 +118,6 @@ brew "ollama"  # Local LLM runner
 # Database Tools
 brew "sqlite"  # SQLite database
 
-# 1Password CLI is required for secret-backed setup. GUI apps and fonts live in
-# Brewfile.apps so the default bootstrap has a smaller disk footprint.
+# 1Password CLI is required for secret-backed setup. Other GUI apps and fonts
+# live in Brewfile.apps so the default bootstrap has a smaller disk footprint.
 cask "1password-cli"
