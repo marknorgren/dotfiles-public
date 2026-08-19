@@ -87,6 +87,15 @@ for local_file in "$DOTFILES"/local/*.sh(N); do
 done
 unset local_file
 
+# Authenticated/private repositories can extend the public base without taking
+# ownership of ~/.zshrc. Files load in lexical order so overlays can choose a
+# stable priority such as 50-private.zsh.
+_dotfiles_overlay_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/overlays.d"
+for overlay_file in "$_dotfiles_overlay_dir"/*.zsh(N); do
+    [[ -r "$overlay_file" ]] && source "$overlay_file"
+done
+unset overlay_file _dotfiles_overlay_dir
+
 # Line-editor plugins: Homebrew on macOS, distro packages on Linux.
 _zsh_source_plugin() {
     local name="$1" file
