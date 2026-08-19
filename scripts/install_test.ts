@@ -223,7 +223,7 @@ Deno.test({
     const { output } = result;
     const reportedDirectory = output.match(/Dotfiles directory: ([^\n]+)/)?.[1];
     assert(
-      reportedDirectory?.endsWith("/dotfiles-public"),
+      reportedDirectory === repoRoot,
       `expected checkout directory, got: ${output}`,
     );
     assert(
