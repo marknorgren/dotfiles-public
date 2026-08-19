@@ -41,18 +41,19 @@ Reference: [macOS settings](docs/macos-settings.md).
 
 ## Terminal and Editors
 
-On macOS, `just install-apps` installs Warp, VS Code, Sublime Text, and Ghostty.
-The linked VS Code and Cursor settings use Warp as the external terminal and zsh
-as the integrated terminal profile. The shell exports `TERMINAL=Warp.app` as a
-hint for tools that honor it.
+On macOS, the default installer installs Warp because the linked VS Code and
+Cursor settings use it as the external terminal. They use zsh as the integrated
+terminal profile, and the shell exports `TERMINAL=Warp.app` as a hint for tools
+that honor it. `just install-apps` installs additional applications such as VS
+Code, Zed, Sublime Text, and Ghostty.
 
 macOS does not provide a reliable global "default terminal app" setting for
 automation. This repo sets the defaults it can control without taking over
 private app preferences.
 
-GUI apps and fonts live in `Brewfile.apps` and install with `just install-apps`.
-The default installer keeps `just`, mise, and other command line tools in the
-required `Brewfile`.
+Other GUI apps and fonts live in `Brewfile.apps` and install with
+`just install-apps`. The default installer keeps Warp, `just`, mise, and other
+required tools in `Brewfile`.
 
 ## Tool Choices
 
