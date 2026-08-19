@@ -54,6 +54,7 @@ setup-macos:
 macos-check:
     bash -n .macos
     shellcheck --shell=bash -x .macos
+    @if [ "$(uname -s)" = "Darwin" ]; then xcrun clang -fobjc-arc -fsyntax-only scripts/finder-sidebar.m; fi
 
 SHELL_SOURCES := "install bin/devcontainer-stack scripts/container-check.sh .devcontainer/post-create.sh .macos"
 

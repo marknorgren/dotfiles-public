@@ -60,6 +60,7 @@ Deno.test({
     await git("init", "--quiet");
     await git("config", "user.email", "test@example.invalid");
     await git("config", "user.name", "Test");
+    await git("config", "commit.gpgsign", "false");
 
     // Assembled at runtime from random bytes so this file never contains a
     // token-shaped literal, and high-entropy because gitleaks filters

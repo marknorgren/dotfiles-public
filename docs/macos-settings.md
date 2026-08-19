@@ -18,8 +18,9 @@ just setup-macos
 `macos-review` runs `.macos --dry-run` and prints each command without changing
 preferences.
 
-`setup-macos` runs `.macos`, writes per-user preferences, then restarts Dock,
-Finder, SystemUIServer, and `cfprefsd`.
+`setup-macos` runs `.macos`, writes per-user preferences, configures Finder's
+toolbar and Favorites, then restarts Dock, Finder, SystemUIServer, and
+`cfprefsd`.
 
 ## Scope
 
@@ -55,6 +56,8 @@ legacy System Preferences automation.
 | Finder     | `NSGlobalDomain AppleShowAllExtensions`                                      | `true`            | Shows all filename extensions.                             | Still relevant. Apple still exposes this Finder setting.                     |
 | Finder     | `com.apple.finder ShowPathbar`                                               | `true`            | Shows the Finder path bar.                                 | Still relevant.                                                              |
 | Finder     | `com.apple.finder ShowStatusBar`                                             | `true`            | Shows the Finder status bar.                               | Still relevant.                                                              |
+| Finder     | `NSToolbar Configuration Browser`                                            | includes `PATH`   | Adds the Path button while preserving other toolbar items. | Empirically verified on macOS 27.0.                                          |
+| Finder     | `com.apple.LSSharedFileList.FavoriteItems`                                   | Home at index `0` | Shows Home first in the Finder Favorites section.          | Uses macOS's bundled SharedFileList framework; verified on macOS 27.0.       |
 | Finder     | `com.apple.finder _FXSortFoldersFirst`                                       | `true`            | Keeps folders on top when sorting by name.                 | Still relevant. Apple still exposes this Finder setting.                     |
 | Finder     | `com.apple.desktopservices DSDontWriteNetworkStores`                         | `true`            | Prevents Finder `.DS_Store` writes on network volumes.     | Still relevant. Apple documents the network-volume default.                  |
 | Finder     | `com.apple.desktopservices DSDontWriteUSBStores`                             | `true`            | Prevents Finder `.DS_Store` writes on USB volumes.         | Useful, but less directly documented by Apple than the network setting.      |
@@ -72,6 +75,12 @@ legacy System Preferences automation.
 | Keyboard   | `NSGlobalDomain NSAutomaticSpellingCorrectionEnabled`                        | `false`           | Disables automatic spelling correction.                    | Still relevant. Apple still exposes this input-source setting.               |
 | Keyboard   | `NSGlobalDomain ApplePressAndHoldEnabled`                                    | `false`           | Uses key repeat instead of press-and-hold accent popovers. | Still relevant for repeat-heavy typing workflows.                            |
 | UI         | `NSGlobalDomain AppleShowScrollBars`                                         | `Always`          | Always shows scrollbars.                                   | Still relevant. Apple still exposes scrollbar behavior in Appearance.        |
+
+The Finder toolbar update exports and imports the current Finder preference
+domain so it can insert the Path button without replacing existing toolbar
+items. The Favorites helper is compiled locally with Apple's command-line tools
+and uses the SharedFileList framework bundled with macOS. Both operations are
+idempotent.
 
 ## Restarted processes
 
