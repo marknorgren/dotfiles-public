@@ -11,6 +11,53 @@ async function writeExecutable(path: string, contents: string): Promise<void> {
 
 const repoRoot = fromFileUrl(new URL("../", import.meta.url));
 
+Deno.test({
+  name: "zsh loads external overlays in lexical order",
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    try {
+      await Deno.stat("/bin/zsh");
+    } catch {
+      return;
+    }
+
+    const home = await Deno.makeTempDir();
+    const overlayDir = `${home}/config/dotfiles/overlays.d`;
+    await Deno.mkdir(overlayDir, { recursive: true });
+    await Deno.writeTextFile(
+      `${overlayDir}/20-second.zsh`,
+      'DOTFILES_OVERLAY_ORDER+="second"\n',
+    );
+    await Deno.writeTextFile(
+      `${overlayDir}/10-first.zsh`,
+      'DOTFILES_OVERLAY_ORDER="first-"\n',
+    );
+
+    const command = new Deno.Command("/bin/zsh", {
+      args: [
+        "-dfc",
+        'source "$DOTFILES/.zshrc"; print -r -- "$DOTFILES_OVERLAY_ORDER"',
+      ],
+      clearEnv: true,
+      env: {
+        DOTFILES: repoRoot,
+        HOME: home,
+        PATH: "/usr/bin:/bin",
+        XDG_CONFIG_HOME: `${home}/config`,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const { code, stdout, stderr } = await command.output();
+    assert(code === 0, new TextDecoder().decode(stderr));
+    assert(
+      new TextDecoder().decode(stdout).trim() === "first-second",
+      "external zsh overlays did not load in lexical order",
+    );
+  },
+});
+
 Deno.test("global ignores preserve shareable Codex project config", async () => {
   const root = await Deno.makeTempDir();
   await Deno.mkdir(`${root}/.codex/skills/example`, { recursive: true });

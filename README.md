@@ -74,6 +74,21 @@ paths in this repo. Use:
 - A separate private overlay repo for work-specific Git, SSH, editor, and agent
   config.
 
+The public base exposes stable extension points so an authenticated/private repo
+can compose with it instead of replacing it:
+
+| Concern | Public-base contract                                                    |
+| ------- | ----------------------------------------------------------------------- |
+| Shell   | Source `~/.config/dotfiles/overlays.d/*.zsh` in lexical order           |
+| Git     | Include `~/.gitconfig.local`                                            |
+| SSH     | Remain machine-local; an overlay may add files below `~/.ssh/config.d/` |
+| Secrets | Stay in 1Password or the OS keychain, never in either checkout          |
+
+A machine can stop after the public install. After authenticating to the private
+repository, run that repository's overlay installer; it should add to these
+extension points and must not relink `~/.zshrc`, `~/.gitconfig`, or other
+public-owned files.
+
 ## Commands
 
 ```bash
