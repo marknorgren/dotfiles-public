@@ -87,7 +87,7 @@ configure_finder_path_button() {
     rm -f "$preferences_file"
 }
 
-configure_finder_home_favorite() {
+configure_finder_favorites() {
     local helper
 
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -118,6 +118,9 @@ echo "Configuring essential settings..."
 
 # Create Books directory if it doesn't exist
 run mkdir -p "$HOME/Documents/Books"
+
+# Create the standard workspace directory
+run mkdir -p "$HOME/working"
 
 # Set system locale and currency settings
 run defaults write NSGlobalDomain AppleLocale -string "en_US"
@@ -162,8 +165,8 @@ run defaults write com.apple.finder ShowStatusBar -bool true
 # Add the Path button without replacing the user's other toolbar items
 configure_finder_path_button
 
-# Add or move Home to the first position in Finder Favorites
-configure_finder_home_favorite
+# Keep Home first and ~/working second in Finder Favorites
+configure_finder_favorites
 
 # Keep folders on top when sorting by name
 run defaults write com.apple.finder _FXSortFoldersFirst -bool true

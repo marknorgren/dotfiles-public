@@ -40,9 +40,35 @@ static NSURL *itemURL(SFLItem *item) {
                                        error:nil];
 }
 
-static BOOL isHomeItem(SFLItem *item, NSURL *homeURL) {
+static BOOL itemMatchesURL(SFLItem *item, NSURL *targetURL) {
     NSURL *url = itemURL(item);
-    return url != nil && [url.URLByStandardizingPath.path isEqualToString:homeURL.path];
+    return url != nil && [url.URLByStandardizingPath.path isEqualToString:targetURL.path];
+}
+
+static BOOL ensureFavorite(
+    SFLGenericList *favorites,
+    NSURL *url,
+    NSUInteger index,
+    BOOL checkOnly,
+    NSError **error
+) {
+    NSArray<SFLItem *> *items = favorites.allItems;
+    if (items.count > index && itemMatchesURL(items[index], url)) {
+        return YES;
+    }
+    if (checkOnly) {
+        return NO;
+    }
+
+    for (SFLItem *item in items) {
+        if (itemMatchesURL(item, url)) {
+            return [favorites moveItem:item toIndex:index error:error];
+        }
+    }
+
+    SFLItem *item = [[NSClassFromString(@"SFLItem") alloc]
+        initWithName:url.lastPathComponent URL:url properties:nil];
+    return [favorites insertItem:item atIndex:index error:error];
 }
 
 int main(int argc, const char *argv[]) {
@@ -56,12 +82,12 @@ int main(int argc, const char *argv[]) {
         }
 
         SFLGenericList *favorites = [[NSClassFromString(@"SFLManager") sharedInstance] favoriteItems];
-        NSArray<SFLItem *> *items = favorites.allItems;
         NSURL *homeURL = [NSURL fileURLWithPath:NSHomeDirectory() isDirectory:YES];
+        NSURL *workingURL = [homeURL URLByAppendingPathComponent:@"working" isDirectory:YES];
         BOOL checkOnly = argc == 2 && strcmp(argv[1], "--check") == 0;
 
         if (argc == 2 && strcmp(argv[1], "--list") == 0) {
-            for (SFLItem *item in items) {
+            for (SFLItem *item in favorites.allItems) {
                 printf("%s\t%s\t%s\n", item.name.UTF8String,
                     NSStringFromClass([item.bookmark class]).UTF8String,
                     itemURL(item).path.UTF8String);
@@ -69,29 +95,21 @@ int main(int argc, const char *argv[]) {
             return 0;
         }
 
-        if (items.count > 0 && isHomeItem(items.firstObject, homeURL)) {
-            return 0;
-        }
-        if (checkOnly) {
-            fputs("Home is not the first Finder Favorite.\n", stderr);
+        if (!ensureFavorite(favorites, homeURL, 0, checkOnly, &error)) {
+            if (checkOnly) {
+                fputs("Home is not the first Finder Favorite.\n", stderr);
+                return 1;
+            }
+            fprintf(stderr, "Unable to keep Home first in Finder Favorites: %s\n",
+                error.localizedDescription.UTF8String);
             return 1;
         }
-
-        for (SFLItem *item in items) {
-            if (isHomeItem(item, homeURL)) {
-                if (![favorites moveItem:item toIndex:0 error:&error]) {
-                    fprintf(stderr, "Unable to move Home in Finder Favorites: %s\n",
-                        error.localizedDescription.UTF8String);
-                    return 1;
-                }
-                return 0;
+        if (!ensureFavorite(favorites, workingURL, 1, checkOnly, &error)) {
+            if (checkOnly) {
+                fputs("working is not the second Finder Favorite.\n", stderr);
+                return 1;
             }
-        }
-
-        SFLItem *homeItem = [[NSClassFromString(@"SFLItem") alloc]
-            initWithName:homeURL.lastPathComponent URL:homeURL properties:nil];
-        if (![favorites insertItem:homeItem atIndex:0 error:&error]) {
-            fprintf(stderr, "Unable to add Home to Finder Favorites: %s\n",
+            fprintf(stderr, "Unable to keep working second in Finder Favorites: %s\n",
                 error.localizedDescription.UTF8String);
             return 1;
         }
