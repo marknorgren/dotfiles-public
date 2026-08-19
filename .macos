@@ -7,6 +7,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 DRY_RUN=false
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "${1:-}" in
     "")
@@ -42,6 +43,73 @@ restart_process() {
     fi
 }
 
+configure_finder_path_button() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '+ add com.apple.finder.PATH to the existing Finder toolbar\n'
+        return
+    fi
+
+    local preferences_file toolbar_items
+    preferences_file="$(mktemp "${TMPDIR:-/tmp}/dotfiles-finder.XXXXXX.plist")"
+
+    if ! defaults export com.apple.finder "$preferences_file" >/dev/null; then
+        rm -f "$preferences_file"
+        return 1
+    fi
+
+    toolbar_items="$(
+        plutil -extract 'NSToolbar Configuration Browser.TB Item Identifiers' \
+            json -o - "$preferences_file" 2>/dev/null || true
+    )"
+    if [[ "$toolbar_items" == *'"com.apple.finder.PATH"'* ]]; then
+        rm -f "$preferences_file"
+        return
+    fi
+
+    if ! plutil -extract 'NSToolbar Configuration Browser' xml1 -o /dev/null \
+        "$preferences_file" 2>/dev/null; then
+        plutil -insert 'NSToolbar Configuration Browser' -dictionary "$preferences_file"
+    fi
+
+    if [[ -n "$toolbar_items" ]]; then
+        plutil -insert 'NSToolbar Configuration Browser.TB Item Identifiers.1' \
+            -string 'com.apple.finder.PATH' "$preferences_file"
+    else
+        plutil -insert 'NSToolbar Configuration Browser.TB Item Identifiers' \
+            -json '["com.apple.finder.BACK","com.apple.finder.PATH","com.apple.finder.SWCH","NSToolbarSpaceItem","com.apple.finder.ARNG","NSToolbarSpaceItem","com.apple.finder.SHAR","com.apple.finder.LABL","com.apple.finder.ACTN","NSToolbarSpaceItem","com.apple.finder.SRCH"]' \
+            "$preferences_file"
+    fi
+
+    if ! defaults import com.apple.finder "$preferences_file" >/dev/null; then
+        rm -f "$preferences_file"
+        return 1
+    fi
+    rm -f "$preferences_file"
+}
+
+configure_finder_favorites() {
+    local helper
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '+ xcrun clang -fobjc-arc -framework Foundation %q -o <temporary-helper>\n' \
+            "$DOTFILES_DIR/scripts/finder-sidebar.m"
+        printf '+ <temporary-helper>\n'
+        return
+    fi
+
+    helper="$(mktemp "${TMPDIR:-/tmp}/dotfiles-finder-sidebar.XXXXXX")"
+    if ! xcrun clang -fobjc-arc -framework Foundation \
+        "$DOTFILES_DIR/scripts/finder-sidebar.m" -o "$helper"; then
+        rm -f "$helper"
+        return 1
+    fi
+    if ! "$helper"; then
+        rm -f "$helper"
+        return 1
+    fi
+    rm -f "$helper"
+}
+
 ###############################################################################
 # Essential Settings                                                           #
 ###############################################################################
@@ -50,6 +118,9 @@ echo "Configuring essential settings..."
 
 # Create Books directory if it doesn't exist
 run mkdir -p "$HOME/Documents/Books"
+
+# Create the standard workspace directory
+run mkdir -p "$HOME/working"
 
 # Set system locale and currency settings
 run defaults write NSGlobalDomain AppleLocale -string "en_US"
@@ -90,6 +161,12 @@ run defaults write NSGlobalDomain AppleShowAllExtensions -bool true
 # Show path bar and status bar
 run defaults write com.apple.finder ShowPathbar -bool true
 run defaults write com.apple.finder ShowStatusBar -bool true
+
+# Add the Path button without replacing the user's other toolbar items
+configure_finder_path_button
+
+# Keep Home first and ~/working second in Finder Favorites
+configure_finder_favorites
 
 # Keep folders on top when sorting by name
 run defaults write com.apple.finder _FXSortFoldersFirst -bool true

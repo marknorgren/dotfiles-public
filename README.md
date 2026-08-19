@@ -34,8 +34,10 @@ just setup-macos
 ```
 
 The script writes per-user Finder, Dock, keyboard, pointer, region, appearance,
-battery status, and scrollbar defaults. It does not configure FileVault,
-screensaver security, power management, or private app preferences.
+battery status, and scrollbar defaults. Finder uses list view for new windows,
+shows hidden files, includes a Path toolbar button, and keeps Home first in
+Favorites with `~/working` immediately after it. It does not configure
+FileVault, screensaver security, power management, or private app preferences.
 
 Reference: [macOS settings](docs/macos-settings.md).
 
