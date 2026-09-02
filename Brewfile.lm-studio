@@ -1,0 +1,5 @@
+# Install: just install-profile lm-studio
+# Check:   just check-profile lm-studio
+
+# Desktop model exploration and agents.
+cask "lm-studio"

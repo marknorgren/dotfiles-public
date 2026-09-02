@@ -1,0 +1,12 @@
+.DS_Store
+.DS_Store?
+.cursor
+cursor-rules.json
+# Claude Code settings
+**/.claude/settings.local.json
+
+# Codex private state. Allow only shareable project config and skills.
+**/.codex/*
+!**/.codex/config.toml
+!**/.codex/skills/
+!**/.codex/skills/**

@@ -1,0 +1,6 @@
+# Install: just install-profile editors
+# Check:   just check-profile editors
+
+# Alternative editor workflows; install individually when only one is needed.
+cask "zed"
+cask "cursor"

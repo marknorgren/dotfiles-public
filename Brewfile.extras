@@ -1,0 +1,13 @@
+# Install: just install-profile extras
+# Check:   just check-profile extras
+
+# GNU compatibility and less frequently used CLI utilities.
+brew "moreutils"
+brew "findutils"
+brew "gnu-sed"
+brew "grep"
+brew "wget"
+brew "pv"
+brew "scc"
+brew "hyperfine"
+brew "terminal-notifier"

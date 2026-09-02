@@ -1,0 +1,22 @@
+{
+  "terminal.external.osxExec": "Ghostty.app",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.macOptionIsMeta": true,
+  "terminal.integrated.commandsToSkipShell": [
+    "workbench.action.terminal.clear"
+  ],
+  "terminal.integrated.sendKeybindingsToShell": true,
+  "git.openRepositoryInParentFolders": "never",
+  "editor.formatOnSave": true,
+  "terminal.integrated.suggest.enabled": true,
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "prettier.printWidth": 80,
+    "prettier.proseWrap": "always"
+  },
+  "prettier.proseWrap": "always",
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

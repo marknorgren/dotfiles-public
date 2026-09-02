@@ -1,0 +1,4 @@
+# Preserve the no-install-scripts policy with pnpm 11+.
+ignoreScripts: true
+# Project packageManager pins remain authoritative.
+managePackageManagerVersions: true

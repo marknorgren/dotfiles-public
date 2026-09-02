@@ -1,0 +1,11 @@
+# Install: just install-profile menubar
+# Check:   just check-profile menubar
+
+# Optional menu-bar manager. Thaw requires macOS 26 or newer.
+if OS.mac?
+  if MacOS.version >= :tahoe
+    cask "thaw"
+  else
+    cask "hiddenbar"
+  end
+end

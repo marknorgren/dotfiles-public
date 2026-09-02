@@ -1,0 +1,11 @@
+# Shared defaults; individual projects may pin older compatible versions.
+node 24.19.0
+python 3.14.7
+ruby 3.4.10
+dotnet 10.0.302
+# Use the explicit npm backend consistently; Node is installed above.
+npm:pnpm 11.25.0
+github:dandavison/delta 0.19.2
+github:junegunn/fzf 0.74.3
+# Keep shfmt equal to CI and devcontainer pins in the public repository.
+shfmt 3.14.0

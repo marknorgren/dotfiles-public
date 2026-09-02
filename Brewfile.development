@@ -1,0 +1,15 @@
+# Install: just install-profile development
+# Check:   just check-profile development
+
+# Additional native-build, Git, database, and network workflows.
+brew "cmake"
+brew "git-lfs"
+brew "git-cliff"
+brew "gnupg"
+brew "sqlite"
+brew "nmap"
+cask "orbstack"
+cask "fork"
+cask "proxyman"
+cask "dbeaver-community"
+cask "dash"  # Documentation app, not the dash shell

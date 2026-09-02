@@ -1,0 +1,18 @@
+# Install: just install-profile apps
+# Check:   just check-profile apps
+
+# Optional personal applications, browser targets, and font.
+cask "font-jetbrains-mono"
+cask "raycast"
+cask "cleanshot"
+cask "stats"
+cask "google-chrome"
+cask "firefox"
+cask "slack"
+cask "telegram"
+cask "spotify"
+cask "obsidian"
+cask "soulver"
+if !File.exist?("/Applications/1Password.app")
+  cask "1password"
+end

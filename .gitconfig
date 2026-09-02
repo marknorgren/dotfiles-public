@@ -1,0 +1,47 @@
+[init]
+    defaultBranch = main
+
+[include]
+    path = ~/.gitconfig.local
+
+[core]
+    excludesfile = ~/.gitignore_global
+    pager = delta
+
+# git-delta: syntax-highlighted, navigable diffs. Installed cross-platform by
+# mise from .tool-versions. If delta is missing, git reports "cannot run delta"
+# and prints unpaged output. Drop these two settings rather than leaving delta
+# uninstalled.
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true       # n/N move between diff sections
+    line-numbers = true
+    hyperlinks = true
+
+[merge]
+    conflictStyle = zdiff3
+
+[diff]
+    colorMoved = default
+
+[pull]
+    rebase = true
+
+[rerere]
+    enabled = true
+    autoupdate = true
+
+[alias]
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
+    lg = log --oneline --graph --decorate --all
+    unstage = reset HEAD --
+    last = log -1 HEAD
+
+[credential "https://github.com"]
+    helper =
+    helper = !gh auth git-credential

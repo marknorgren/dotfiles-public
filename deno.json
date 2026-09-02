@@ -1,0 +1,22 @@
+{
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true
+  },
+  "tasks": {
+    "install": "deno run --allow-read --allow-write --allow-run --allow-env scripts/install.ts",
+    "symlink": "deno run --allow-read --allow-write --allow-run --allow-env scripts/install.ts --skip-packages",
+    "verify": "bin/verify",
+    "fmt:check": "deno fmt --check",
+    "lint": "deno lint",
+    "typecheck": "deno check scripts/*.ts scripts/lib/*.ts",
+    "test": "deno test --allow-read --allow-write --allow-run --allow-env scripts/*_test.ts scripts/lib/*_test.ts",
+    "check": "deno task fmt:check && deno task lint && deno task typecheck && deno task test"
+  },
+  "imports": {
+    "@std/cli/parse-args": "jsr:@std/cli@^1/parse-args",
+    "@std/fs": "jsr:@std/fs@^1",
+    "@std/path": "jsr:@std/path@^1"
+  }
+}

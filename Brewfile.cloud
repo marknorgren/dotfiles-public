@@ -1,0 +1,9 @@
+# Install: just install-profile cloud
+# Check:   just check-profile cloud
+
+# Cloud and infrastructure workflows.
+tap "hashicorp/tap"
+brew "awscli"
+brew "aws-sam-cli"
+brew "tailscale"
+brew "hashicorp/tap/terraform"

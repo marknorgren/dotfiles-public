@@ -1,0 +1,42 @@
+# packages/dnf.txt - Fedora/RHEL packages
+# Used by: ./install on RedHat-based systems
+# Install with: sudo dnf install -y $(cat dnf.txt)
+
+# Shell & terminal
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+tmux
+
+# Modern CLI tools
+bat
+fd-find
+ripgrep
+jq
+tree
+btop
+
+# Development essentials
+git
+curl
+wget
+gcc
+gcc-c++
+make
+cmake
+
+# Python
+python3
+python3-pip
+
+# Editors
+neovim
+
+# Network
+openssh-clients
+iproute
+
+# Utilities
+unzip
+zip
+xclip

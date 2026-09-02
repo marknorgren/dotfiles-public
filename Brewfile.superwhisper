@@ -1,0 +1,5 @@
+# Install: just install-profile superwhisper
+# Check:   just check-profile superwhisper
+
+# Dictation and voice-driven text entry.
+cask "superwhisper"

@@ -1,0 +1,11 @@
+# Install: just install-profile media
+# Check:   just check-profile media
+
+# Media conversion, downloads, documents, archives, and playback.
+brew "imagemagick"
+brew "ffmpeg"
+brew "yt-dlp"
+brew "pandoc"
+brew "sevenzip"
+brew "pigz"
+cask "vlc"

@@ -1,0 +1,5 @@
+# Install: just install-profile warp
+# Check:   just check-profile warp
+
+# Optional alternative terminal.
+cask "warp"

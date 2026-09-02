@@ -1,0 +1,18 @@
+alias g='git'
+alias gs='git status'
+alias w='cd "$HOME/working"'
+alias reload='source ~/.zshrc'
+alias now='date -u +"%Y-%m-%dT%H:%M:%SZ"'
+alias dh='dothelp'
+alias help='dothelp'
+
+if command -v eza >/dev/null 2>&1; then
+    alias ll='eza -la --git'
+    alias la='eza -a'
+    alias tree='eza --tree --level=2'
+else
+    alias ll='ls -lah'
+    alias la='ls -A'
+fi
+alias ..='cd ..'
+alias ...='cd ../..'

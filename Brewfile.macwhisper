@@ -1,0 +1,5 @@
+# Install: just install-profile macwhisper
+# Check:   just check-profile macwhisper
+
+# Transcribe recordings, files, and meetings.
+cask "macwhisper"
