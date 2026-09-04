@@ -12,8 +12,9 @@ Deno.test("agent CLIs use the vendors' recommended native installers", () => {
   );
 
   assert(
-    commands.codex === "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
-    "Codex does not use the official standalone installer",
+    commands.codex ===
+      "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh",
+    "Codex does not use the official standalone installer in non-interactive mode",
   );
   assert(
     commands.claude === "curl -fsSL https://claude.ai/install.sh | bash",

@@ -9,7 +9,8 @@ export const AGENT_CLI_INSTALLERS: readonly AgentCliInstaller[] = [
   {
     name: "OpenAI Codex CLI",
     binary: "codex",
-    command: "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+    command:
+      "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh",
     documentation: "https://learn.chatgpt.com/docs/codex/cli",
   },
   {
