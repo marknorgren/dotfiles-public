@@ -295,7 +295,7 @@ Deno.test("the installer pins the same Deno line CI pins", async () => {
   );
 });
 
-Deno.test("the default Brewfile installs Ghostty and VS Code while other GUI apps stay optional", async () => {
+Deno.test("the default Brewfile installs required GUI apps while other apps stay optional", async () => {
   const brewfile = await Deno.readTextFile(`${repoRoot}Brewfile`);
   const appBrewfile = await Deno.readTextFile(`${repoRoot}Brewfile.apps`);
 
@@ -306,7 +306,12 @@ Deno.test("the default Brewfile installs Ghostty and VS Code while other GUI app
 
   const defaultCasks = [...brewfile.matchAll(/^\s*cask "([^"]+)"/gm)]
     .map((match) => match[1]);
-  const requiredCasks = ["ghostty", "visual-studio-code", "1password-cli"];
+  const requiredCasks = [
+    "ghostty",
+    "visual-studio-code",
+    "agentsview",
+    "1password-cli",
+  ];
   assert(
     defaultCasks.length === requiredCasks.length &&
       requiredCasks.every((cask) => defaultCasks.includes(cask)),

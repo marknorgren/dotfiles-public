@@ -37,4 +37,5 @@ brew "rustup"  # Keg-only; shell configuration adds opt/rustup/bin
 # Default macOS applications
 cask "ghostty"
 cask "visual-studio-code"
+cask "agentsview"
 cask "1password-cli"

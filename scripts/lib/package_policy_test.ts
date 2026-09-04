@@ -56,6 +56,7 @@ Deno.test("package profiles have one owner per package and keep optional tools o
       "brew:neovim",
       "cask:ghostty",
       "cask:visual-studio-code",
+      "cask:agentsview",
     ]
   ) {
     assert(owners.get(key) === "Brewfile", `${key} is missing from the base`);
