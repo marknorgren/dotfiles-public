@@ -88,3 +88,30 @@ Running repository checks requires `just`, `deno`, `shellcheck`, and `shfmt` on
 ## License
 
 [MIT](LICENSE).
+
+## Codex model shortcuts
+
+Start a session with `cx-luna` (Luna Medium), `cx-terra` (Terra Medium),
+`cx-sol` (Sol Low), or `cx-astra` (Astra Low). For harder tasks, use
+`cx-astra-medium`, `cx-astra-high`, `cx-astra-xhigh`, or `cx-astra-max`. Each
+alias forwards normal CLI arguments, including a quoted prompt or `-C`. These
+presets change only the model and reasoning effort.
+
+```sh
+cx-luna "Summarize this repository"
+cx-terra -C ~/working/example
+cx-astra-high "Diagnose the failing integration test"
+```
+
+For plain `codex`, set your personal default in `~/.codex/config.toml`:
+
+```toml
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+```
+
+Existing sessions and project-specific overrides may retain their model choice.
+Reload the shell after updating aliases with `source ~/.zshrc`.
+
+Source: `codex --help` and <https://learn.chatgpt.com/docs/pricing>. LLM
+involvement: authored by Codex (OpenAI, model ID unknown).

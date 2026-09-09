@@ -16,3 +16,15 @@ else
 fi
 alias ..='cd ..'
 alias ...='cd ../..'
+
+# Codex session presets. Each shortcut accepts the normal Codex CLI arguments.
+# Source: codex --help; https://learn.chatgpt.com/docs/pricing
+# LLM involvement: authored by Codex (OpenAI, model ID unknown).
+alias cx-luna='codex -m gpt-5.6-luna -c model_reasoning_effort=medium'
+alias cx-terra='codex -m gpt-5.6-terra -c model_reasoning_effort=medium'
+alias cx-sol='codex -m gpt-5.6-sol -c model_reasoning_effort=low'
+alias cx-astra='codex -m gpt-6-astra -c model_reasoning_effort=low'
+alias cx-astra-medium='codex -m gpt-6-astra -c model_reasoning_effort=medium'
+alias cx-astra-high='codex -m gpt-6-astra -c model_reasoning_effort=high'
+alias cx-astra-xhigh='codex -m gpt-6-astra -c model_reasoning_effort=xhigh'
+alias cx-astra-max='codex -m gpt-6-astra -c model_reasoning_effort=max'
