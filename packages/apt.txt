@@ -19,9 +19,23 @@ btop
 # Development essentials
 git
 curl
+ca-certificates
+shellcheck
 wget
 build-essential
 cmake
+pkg-config
+autoconf
+bison
+libssl-dev
+zlib1g-dev
+libreadline-dev
+libyaml-dev
+libffi-dev
+libgmp-dev
+libbz2-dev
+libsqlite3-dev
+liblzma-dev
 
 # Python
 python3

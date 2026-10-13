@@ -183,7 +183,7 @@ fi
   await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
 
   const command = new Deno.Command("/bin/bash", {
-    args: [`${repoRoot}/install`],
+    args: [`${repoRoot}/install`, "--skip-packages"],
     cwd: repoRoot,
     env: {
       CURL_MARKER: curlMarker,
@@ -719,7 +719,7 @@ exit 0
     await writeExecutable(`${homebrewBin}/brew`, "#!/bin/sh\nexit 0\n");
 
     const command = new Deno.Command("/bin/bash", {
-      args: [`${repoRoot}/install`],
+      args: [`${repoRoot}/install`, "--skip-packages"],
       cwd: repoRoot,
       env: {
         DENO_DIR: denoDir,
@@ -1617,11 +1617,11 @@ Deno.test({
     const home = `${root}/home`;
     const bin = `${root}/bin`;
 
-    let packageManager: "apt" | "dnf";
+    let packageManager: "apt-get" | "dnf";
     let manifest: "apt.txt" | "dnf.txt";
     try {
       await Deno.stat("/etc/debian_version");
-      packageManager = "apt";
+      packageManager = "apt-get";
       manifest = "apt.txt";
     } catch {
       try {

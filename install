@@ -34,11 +34,15 @@ TARGET_DIR="${DOTFILES_TARGET:-$HOME/.dotfiles-public}"
 DENO_VERSION="v2.8.3"
 MIN_FREE_KB="${DOTFILES_MIN_FREE_KB:-8388608}"
 DRY_RUN=0
+SKIP_PACKAGES=0
+SKIP_SYSTEM_UPDATE=0
 for arg in "$@"; do
     if [[ "$arg" == "--dry-run" || "$arg" == "-n" ]]; then
         DRY_RUN=1
-        break
     fi
+    [[ "$arg" != "--skip-packages" ]] || SKIP_PACKAGES=1
+    [[ "$arg" != "--skip-system-update" ]] || SKIP_SYSTEM_UPDATE=1
+    [[ "$arg" != "--help" && "$arg" != "-h" ]] || SKIP_PACKAGES=1
 done
 
 REMOTE_BOOTSTRAP=0
@@ -56,7 +60,7 @@ fi
 # A remote one-liner run from an existing checkout should update that checkout,
 # not create a second copy under ~/.dotfiles-public.
 if ((REMOTE_BOOTSTRAP == 1)) && [[ -z "${DOTFILES_TARGET:-}" ]] &&
-    [[ -d "$PWD/.git" && -f "$PWD/scripts/install.ts" ]]; then
+    [[ -e "$PWD/.git" && -f "$PWD/scripts/install.ts" ]]; then
     TARGET_DIR="$PWD"
 fi
 
@@ -214,7 +218,7 @@ check_storage_path() {
 preflight_storage() {
     local brew
     local prefix
-    local temp_dir="${TMPDIR:-/private/tmp}"
+    local temp_dir="${TMPDIR:-/tmp}"
 
     if [[ ! "$MIN_FREE_KB" =~ ^[0-9]+$ ]]; then
         log_error "DOTFILES_MIN_FREE_KB must be a non-negative integer"
@@ -267,6 +271,23 @@ ensure_deno_archive_tool() {
     fi
 }
 
+# Bootstrap prerequisites must exist before a remote invocation can clone.
+# Preserve the flag across the local re-exec to avoid a second system upgrade.
+prepare_ubuntu() {
+    [[ "$(detect_platform)" == "linux" ]] || return 0
+    command -v apt-get &>/dev/null || return 0
+    ((DRY_RUN == 0 && SKIP_PACKAGES == 0)) || return 0
+    [[ "${DOTFILES_SYSTEM_PREPARED:-0}" != "1" ]] || return 0
+
+    log_header "Preparing Debian/Ubuntu"
+    run_as_root apt-get update
+    if ((SKIP_SYSTEM_UPDATE == 0)); then
+        run_as_root apt-get upgrade -y
+    fi
+    run_as_root apt-get install -y git curl ca-certificates unzip
+    export DOTFILES_SYSTEM_PREPARED=1
+}
+
 # Install Xcode Command Line Tools (macOS only)
 install_xcode_cli() {
     if [[ "$(detect_platform)" != "macos" ]]; then
@@ -308,7 +329,7 @@ bootstrap_repo_if_needed() {
         exit 1
     fi
 
-    if [[ -d "$TARGET_DIR/.git" ]]; then
+    if [[ -e "$TARGET_DIR/.git" ]]; then
         log_info "Updating existing checkout: $TARGET_DIR"
         log_info "Repository Git: $git_command"
         "$git_command" -C "$TARGET_DIR" pull --ff-only
@@ -339,6 +360,8 @@ main() {
     log_info "Platform: $(detect_platform)"
 
     preflight_storage
+
+    prepare_ubuntu
 
     # macOS: ensure Xcode CLI tools
     install_xcode_cli
