@@ -9,3 +9,7 @@ github:dandavison/delta 0.19.2
 github:junegunn/fzf 0.74.3
 # Keep shfmt equal to CI and devcontainer pins in the public repository.
 shfmt 3.14.0
+
+# Shared task runner and Python package manager, including Linux installs.
+just 1.51.0
+uv 0.9.10

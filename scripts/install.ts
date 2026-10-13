@@ -16,11 +16,21 @@ interface InstallOptions {
   skipPackages: boolean;
   skipSymlinks: boolean;
   force: boolean;
+  skipSystemUpdate: boolean;
+  skipVerify: boolean;
 }
 
 async function main() {
   const args = parseArgs(Deno.args, {
-    boolean: ["dry-run", "skip-packages", "skip-symlinks", "force", "help"],
+    boolean: [
+      "dry-run",
+      "skip-packages",
+      "skip-symlinks",
+      "skip-system-update",
+      "skip-verify",
+      "force",
+      "help",
+    ],
     alias: { n: "dry-run", h: "help" },
   });
 
@@ -34,6 +44,8 @@ Options:
   -n, --dry-run       Show what would be done without making changes
   --skip-packages     Skip package installation
   --skip-symlinks     Skip symlink creation
+  --skip-system-update Skip the Debian/Ubuntu system upgrade
+  --skip-verify       Skip installed setup verification
   --force             Overwrite existing files without backup
   -h, --help          Show this help
 `);
@@ -45,6 +57,8 @@ Options:
     skipPackages: args["skip-packages"] ?? false,
     skipSymlinks: args["skip-symlinks"] ?? false,
     force: args.force ?? false,
+    skipSystemUpdate: args["skip-system-update"] ?? false,
+    skipVerify: args["skip-verify"] ?? false,
   };
 
   if (options.dryRun) {
@@ -90,12 +104,41 @@ Options:
   // Create local directory for machine-specific overrides
   await setupLocalDir(paths, options);
 
+  if (!options.skipPackages && !options.skipSymlinks && !options.skipVerify) {
+    log.header("Verifying installed setup");
+    if (options.dryRun) {
+      log.dim("$ mise exec -- bin/verify (VERIFY_INSTALLED=1)");
+    } else {
+      await run(["mise", "exec", "--", `${paths.dotfiles}/bin/verify`], {
+        cwd: paths.dotfiles,
+        env: { VERIFY_INSTALLED: "1" },
+      });
+    }
+  }
+
+  if (platform.platform === "linux" && !options.dryRun) {
+    try {
+      await Deno.stat("/var/run/reboot-required");
+      log.warn(
+        "System updates require a reboot. Reboot when ready, then run VERIFY_INSTALLED=1 just verify.",
+      );
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+    log.info(
+      "To use Zsh now: exec zsh -l. To change your login shell: chsh -s /usr/bin/zsh",
+    );
+  }
+
   log.header("Done!");
   if (options.dryRun) {
     log.success("Dry run completed; no changes were made");
   } else {
     log.success("Dotfiles installed successfully");
-    log.info("Restart your shell or run: source ~/.zshrc");
+    log.info("Restart your shell or run: exec zsh -l");
+    if (!options.skipPackages) {
+      log.info("Sign in manually by running claude and codex.");
+    }
   }
 }
 
@@ -491,8 +534,13 @@ async function installLinuxPackages(
     if (packages.length > 0) {
       log.step("Installing apt packages...");
       if (!options.dryRun) {
-        await run(["sudo", "apt", "update"]);
-        await run(["sudo", "apt", "install", "-y", ...packages]);
+        if (Deno.env.get("DOTFILES_SYSTEM_PREPARED") !== "1") {
+          await run(["sudo", "apt-get", "update"]);
+          if (!options.skipSystemUpdate) {
+            await run(["sudo", "apt-get", "upgrade", "-y"]);
+          }
+        }
+        await run(["sudo", "apt-get", "install", "-y", ...packages]);
       }
     }
   } else if (platform.distro === "redhat") {

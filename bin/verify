@@ -104,6 +104,20 @@ test_tool fzf "Ctrl-R and Ctrl-T key bindings"
 test_tool shfmt "shell formatter, see just check"
 echo ""
 
+# A full installation must execute the configured runtimes and agent binaries,
+# not merely find a file on PATH. Plain checkout verification stays lightweight.
+if [[ "${VERIFY_INSTALLED:-0}" = "1" ]]; then
+    echo "🚀 Installed Development Tools:"
+    for tool in deno zsh git just mise node pnpm python3 ruby dotnet uv tmux starship codex claude; do
+        if [[ "$tool" = "tmux" ]]; then
+            test_cmd "tmux -V" "tmux executes"
+        else
+            test_cmd "$tool --version" "$tool executes"
+        fi
+    done
+    echo ""
+fi
+
 # Shell wiring that other parts of the setup depend on.
 echo "🔌 Shell Wiring:"
 test_cmd "typeset -f _zsh_cache_init" "_zsh_cache_init (init cache)"

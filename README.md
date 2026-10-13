@@ -22,6 +22,49 @@ Preview first:
 The installer uses `~/.dotfiles-public` by default. Set `DOTFILES_TARGET` to
 override that path.
 
+## Ubuntu
+
+Run the install command above inside Ubuntu as your normal user, with sudo
+access. The first invocation needs Bash and curl. If curl is missing:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y curl ca-certificates
+```
+
+On Debian/Ubuntu, setup updates the package index and upgrades installed system
+packages before it installs bootstrap dependencies, clones the repository, or
+installs development tools. It then installs the shell packages, Claude Code,
+Codex CLI, mise runtimes, just, and uv; links configuration with backups; and
+runs installed-mode verification. Verification executes each required tool and
+checks shell configuration and links. A failed update, installation, or check
+stops setup with a nonzero exit status. It does not perform an Ubuntu release
+upgrade, remove packages with autoremove, or reboot automatically.
+
+Sign in to Claude Code and Codex yourself after installation. Setup checks that
+the CLIs execute; it does not verify account access, usage limits, project
+tests, or VM isolation. If a reboot is required, setup reports it. To start the
+configured shell, run `exec zsh -l`; to make it your login shell, run
+`chsh -s /usr/bin/zsh`, then sign out and back in.
+
+Rerun the same install command to update the checkout and tools. To skip the
+system upgrade while still installing packages:
+
+```bash
+./install --skip-system-update
+```
+
+`--skip-packages` skips system updates, distro packages, and agent CLI
+installers. `--skip-verify` skips the final installed check. Partial
+package/link runs do not run the full installed check. A dry run previews
+changes but requires Deno to be installed already; the remote entry point may
+clone or update its checkout.
+
+For long agent runs, keep repositories on the guest disk and use tmux. Disable
+Ubuntu automatic suspend and keep the host awake. Configure host sharing and
+credentials separately in the VM application. Agent permission bypass is not
+enabled by this installer.
+
 ## Ownership
 
 This repository owns the primary shell, Git, editor, terminal, runtime, and
@@ -68,7 +111,8 @@ See [macOS settings](docs/macos-settings.md) for the settings managed here.
 [tool alternatives](docs/tool-alternatives.md) for rationale and migration
 notes. The installer also uses the vendors' native installers for Codex CLI and
 Claude Code; both binaries live in `~/.local/bin` and update independently of
-Homebrew.
+Homebrew. Rerunning setup installs or updates them. Just and uv are also pinned
+in `.tool-versions` so Linux has the same commands.
 
 ## Commands
 
